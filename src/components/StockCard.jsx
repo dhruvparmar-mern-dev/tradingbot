@@ -16,37 +16,90 @@ export default function StockCard({ stock }) {
 
   const analyzeStock = async () => {
     setLoading(true);
-
     try {
-      // Fetch all 3 in parallel
-      const [newsRes, chartRes] = await Promise.all([
-        fetch(`/api/news?symbol=${stock.symbol}`),
-        fetch(`/api/chart?symbol=${stock.symbol}`),
-      ]);
+      // Check if memory exists for this stock
+      const memoryRes = await fetch(`/api/memory?symbol=${stock.symbol}`);
+      const memory = await memoryRes.json();
 
-      const [newsData, chartData] = await Promise.all([
-        newsRes.json(),
-        chartRes.json(),
-      ]);
+      const hasMemory = memory && memory.lastAnalysis;
+
+      // If memory exists → only fetch fresh price + news (skip heavy chart)
+      // If no memory → fetch everything for deep analysis
+      const fetchPromises = hasMemory
+        ? [fetch(`/api/news?symbol=${stock.symbol}`)]
+        : [
+            fetch(`/api/news?symbol=${stock.symbol}`),
+            fetch(`/api/chart?symbol=${stock.symbol}`),
+          ];
+
+      const responses = await Promise.all(fetchPromises);
+      const [newsData, chartData] = hasMemory
+        ? [await responses[0].json(), null]
+        : [await responses[0].json(), await responses[1].json()];
 
       setNews(newsData);
 
+      // Get AI signal
       const aiRes = await fetch("/api/ai-signal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stockData: stock, news: newsData, chartData }),
+        body: JSON.stringify({
+          stockData: stock,
+          news: newsData,
+          chartData: hasMemory ? null : chartData,
+          memory: hasMemory ? memory : null,
+        }),
       });
 
       const aiData = await aiRes.json();
-
-      if (!aiRes.ok) {
-        toast.error(aiData.error || "AI analysis failed");
-        return;
-      }
+      if (!aiRes.ok) return toast.error(aiData.error || "AI analysis failed");
 
       setSignal(aiData);
-      toast.success("Analysis complete!");
+
+      // Save updated memory to MongoDB
+      if (aiData.memoryUpdate) {
+        const newMemory = {
+          ...memory,
+          character: aiData.memoryUpdate.character,
+          behavior: aiData.memoryUpdate.behavior,
+          keyLevels: aiData.memoryUpdate.keyLevels,
+          lastAnalysis: {
+            signal: aiData.signal,
+            confidence: aiData.confidence,
+            rsi: chartData?.indicators?.rsi || memory?.lastAnalysis?.rsi,
+            trend: chartData?.indicators?.trend || memory?.lastAnalysis?.trend,
+            reason: aiData.reason,
+            stopLoss: aiData.stopLoss,
+            target: aiData.target,
+            price: stock.price,
+            date: new Date(),
+          },
+          signalHistory: [
+            ...(memory?.signalHistory || []),
+            {
+              signal: aiData.signal,
+              confidence: aiData.confidence,
+              price: stock.price,
+              date: new Date(),
+              outcome: "PENDING",
+            },
+          ].slice(-20), // keep last 20 signals only
+        };
+
+        await fetch("/api/memory", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ symbol: stock.symbol, memory: newMemory }),
+        });
+      }
+
+      toast.success(
+        hasMemory
+          ? "⚡ Quick analysis done!"
+          : "🧠 Deep analysis done! Memory saved.",
+      );
     } catch (err) {
+      console.error(err);
       toast.error("Something went wrong");
     } finally {
       setLoading(false);
@@ -120,7 +173,13 @@ export default function StockCard({ stock }) {
         ))}
       </div>
 
-      {/* AI Signal */}
+      {signal?.memoryUpdate && (
+        <div className="bg-zinc-800/50 rounded-lg px-3 py-2 text-xs text-zinc-400 border border-zinc-700/50">
+          🧠{" "}
+          <span className="text-zinc-300">{signal.memoryUpdate.character}</span>
+        </div>
+      )}
+
       {/* AI Signal */}
       {signal && (
         <div className="bg-zinc-800 rounded-lg p-3 flex flex-col gap-3">

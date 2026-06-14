@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 export async function POST(request) {
-  const { stockData, news, chartData } = await request.json();
+  const { stockData, news, chartData, memory } = await request.json();
 
   const newsText =
     news.length > 0
@@ -21,8 +21,46 @@ Resistance: ₹${indicators.resistance}
 `
     : "No technical data available";
 
-  const prompt = `
-You are an expert Indian stock market trading assistant. Analyze this stock using both technical indicators and news.
+  // If memory exists → fast analysis with just new info
+  // If no memory → deep analysis and build memory
+  const prompt = memory
+    ? `
+You are an expert Indian stock market trading assistant with memory of this stock.
+
+YOUR MEMORY OF ${stockData.symbol}:
+Character: ${memory.character}
+Known Behavior: ${memory.behavior}
+Key Levels: Support ₹${memory.keyLevels?.support} | Resistance ₹${memory.keyLevels?.resistance}
+Last Signal: ${memory.lastAnalysis?.signal} on ${new Date(memory.lastAnalysis?.date).toLocaleDateString("en-IN")} at ₹${memory.lastAnalysis?.price || "unknown"}
+Past Signals: ${memory.signalHistory?.length || 0} signals recorded
+
+TODAY'S UPDATE:
+Price: ₹${stockData.price} (${stockData.change?.toFixed(2)}% change)
+High: ₹${stockData.high} | Low: ₹${stockData.low}
+Volume: ${stockData.volume?.toLocaleString()}
+${technicalText}
+
+NEW NEWS TODAY:
+${newsText}
+
+Based on your memory + today's update, give a quick decision.
+Respond in this exact JSON format only, no extra text:
+{
+  "signal": "BUY" or "SELL" or "HOLD",
+  "confidence": number 1-10,
+  "reason": "2-3 lines referencing your memory + what changed today",
+  "stopLoss": number,
+  "target": number,
+  "riskLevel": "LOW" or "MEDIUM" or "HIGH",
+  "memoryUpdate": {
+    "character": "updated character if anything changed, else keep same",
+    "behavior": "updated behavior observation",
+    "keyLevels": { "support": number, "resistance": number }
+  }
+}
+`
+    : `
+You are an expert Indian stock market trading assistant. Do a DEEP analysis of this stock and build a memory profile.
 
 STOCK INFO:
 Symbol: ${stockData.symbol} (${stockData.name})
@@ -39,19 +77,19 @@ ${technicalText}
 RECENT NEWS:
 ${newsText}
 
-Based on ALL the above data give a trading signal.
-RSI > 70 = overbought (avoid buying), RSI < 30 = oversold (good to buy).
-MACD bullish crossover = buy signal, bearish = sell signal.
-Price near support = good buy, near resistance = risky buy.
-
-Respond in this exact JSON format only, no extra text, no markdown:
+Respond in this exact JSON format only, no extra text:
 {
   "signal": "BUY" or "SELL" or "HOLD",
-  "confidence": a number from 1 to 10,
-  "reason": "3-4 line explanation mentioning RSI, MACD, trend and news",
-  "stopLoss": suggested stop loss price as number,
-  "target": suggested target price as number,
-  "riskLevel": "LOW" or "MEDIUM" or "HIGH"
+  "confidence": number 1-10,
+  "reason": "3-4 lines with full analysis mentioning RSI, MACD, trend and news",
+  "stopLoss": number,
+  "target": number,
+  "riskLevel": "LOW" or "MEDIUM" or "HIGH",
+  "memoryUpdate": {
+    "character": "1-2 lines about this stock personality, sector, what affects it",
+    "behavior": "1-2 lines about how this stock typically behaves based on what you see",
+    "keyLevels": { "support": number, "resistance": number }
+  }
 }
 `;
 
@@ -80,6 +118,5 @@ Respond in this exact JSON format only, no extra text, no markdown:
 
   const text = data.content[0].text;
   const clean = text.replace(/```json|```/g, "").trim();
-
   return NextResponse.json(JSON.parse(clean));
 }
