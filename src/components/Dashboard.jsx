@@ -4,6 +4,8 @@ import useTradingStore from "@/store/tradingStore";
 import StockCard from "./StockCard";
 import TradeLog from "./TradeLog";
 import { toast } from "sonner";
+import useAutoTrader from "@/hooks/useAutoTrader";
+import AutoTradeSettings from "./AutoTradeSettings";
 
 export default function Dashboard() {
   const [search, setSearch] = useState("");
@@ -77,6 +79,8 @@ export default function Dashboard() {
       setSearching(false);
     }
   };
+
+  useAutoTrader();
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -214,6 +218,7 @@ export default function Dashboard() {
             <TradeLog />
           ))}
       </div>
+      <AutoTradeSettings />
     </div>
   );
 }

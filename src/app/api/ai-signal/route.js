@@ -1,12 +1,28 @@
 import { NextResponse } from "next/server";
 
 export async function POST(request) {
-  const { stockData, news, chartData, memory } = await request.json();
+  const { stockData, news, chartData, memory, marketContext } =
+    await request.json();
 
   const newsText =
     news.length > 0
       ? news.map((n) => `- ${n.title} (${n.source})`).join("\n")
       : "No news available";
+
+  const marketText = marketContext
+    ? `
+MARKET CONTEXT:
+NIFTY 50: ${marketContext.nifty?.change >= 0 ? "▲" : "▼"} ${Math.abs(marketContext.nifty?.change || 0).toFixed(2)}% (${marketContext.nifty?.sentiment})
+Sector (${marketContext.sector?.name}): ${marketContext.sector?.change >= 0 ? "▲" : "▼"} ${Math.abs(marketContext.sector?.change || 0).toFixed(2)}% (${marketContext.sector?.sentiment})
+Overall Market: ${marketContext.marketSentiment}
+
+Rules:
+- If NIFTY is BEARISH, avoid BUY signals unless stock is very strong
+- If NIFTY is BULLISH, BUY signals are more reliable
+- If sector is BEARISH but stock is up, it may be short lived
+- If sector is BULLISH and stock is up, strong confirmation
+`
+    : "";
 
   const indicators = chartData?.indicators;
   const technicalText = indicators
@@ -43,6 +59,8 @@ ${technicalText}
 NEW NEWS TODAY:
 ${newsText}
 
+${marketText}
+
 Based on your memory + today's update, give a quick decision.
 Respond in this exact JSON format only, no extra text:
 {
@@ -76,6 +94,8 @@ ${technicalText}
 
 RECENT NEWS:
 ${newsText}
+
+${marketText}
 
 Respond in this exact JSON format only, no extra text:
 {
@@ -115,8 +135,16 @@ Respond in this exact JSON format only, no extra text:
       { status: 500 },
     );
   }
-
   const text = data.content[0].text;
   const clean = text.replace(/```json|```/g, "").trim();
-  return NextResponse.json(JSON.parse(clean));
+
+  try {
+    return NextResponse.json(JSON.parse(clean));
+  } catch (err) {
+    console.error("JSON parse error:", clean);
+    return NextResponse.json(
+      { error: "AI returned invalid response" },
+      { status: 500 },
+    );
+  }
 }

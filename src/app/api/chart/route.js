@@ -64,6 +64,20 @@ export async function GET(request) {
     const resistance = Math.max(...last20Highs).toFixed(2);
     const support = Math.min(...last20Lows).toFixed(2);
 
+    // Volume analysis
+    const avgVolume =
+      volumes
+        .slice(-20)
+        .filter(Boolean)
+        .reduce((a, b) => a + b, 0) / 20;
+    const todayVolume = volumes[volumes.length - 1] || 0;
+    const volumeRatio = (todayVolume / avgVolume).toFixed(2);
+    let volumeSignal = "NORMAL";
+    if (volumeRatio > 1.5) volumeSignal = "HIGH";
+    if (volumeRatio > 2.5) volumeSignal = "VERY_HIGH";
+    if (volumeRatio < 0.5) volumeSignal = "LOW";
+
+    // Add to indicators in return
     return NextResponse.json({
       candles: candles.slice(-30), // last 30 days for chart
       indicators: {
@@ -78,6 +92,12 @@ export async function GET(request) {
         trendStrength: `${trendStrength}%`,
         support,
         resistance,
+        volume: {
+          today: todayVolume,
+          avg20Day: Math.round(avgVolume),
+          ratio: volumeRatio,
+          signal: volumeSignal,
+        },
       },
     });
   } catch (err) {

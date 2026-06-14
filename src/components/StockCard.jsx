@@ -13,50 +13,47 @@ export default function StockCard({ stock }) {
     useTradingStore();
 
   const holding = portfolio.find((p) => p.symbol === stock.symbol);
+  const [marketContext, setMarketContext] = useState(null);
 
   const analyzeStock = async () => {
     setLoading(true);
     try {
-      // Check if memory exists for this stock
       const memoryRes = await fetch(`/api/memory?symbol=${stock.symbol}`);
       const memory = await memoryRes.json();
-
       const hasMemory = memory && memory.lastAnalysis;
 
-      // If memory exists → only fetch fresh price + news (skip heavy chart)
-      // If no memory → fetch everything for deep analysis
-      const fetchPromises = hasMemory
-        ? [fetch(`/api/news?symbol=${stock.symbol}`)]
-        : [
-            fetch(`/api/news?symbol=${stock.symbol}`),
-            fetch(`/api/chart?symbol=${stock.symbol}`),
-          ];
+      // Always fetch market context + news, chart only if no memory
+      const fetchPromises = [
+        fetch(`/api/news?symbol=${stock.symbol}`),
+        fetch(`/api/market-context?symbol=${stock.symbol}`),
+        ...(!hasMemory ? [fetch(`/api/chart?symbol=${stock.symbol}`)] : []),
+      ];
 
       const responses = await Promise.all(fetchPromises);
-      const [newsData, chartData] = hasMemory
-        ? [await responses[0].json(), null]
-        : [await responses[0].json(), await responses[1].json()];
+      const newsData = await responses[0].json();
+      const marketContextData = await responses[1].json();
+      const chartData = !hasMemory ? await responses[2].json() : null;
 
       setNews(newsData);
+      setMarketContext(marketContextData);
 
-      // Get AI signal
       const aiRes = await fetch("/api/ai-signal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           stockData: stock,
           news: newsData,
-          chartData: hasMemory ? null : chartData,
+          chartData,
           memory: hasMemory ? memory : null,
+          marketContext: marketContextData,
         }),
       });
 
       const aiData = await aiRes.json();
       if (!aiRes.ok) return toast.error(aiData.error || "AI analysis failed");
-
       setSignal(aiData);
 
-      // Save updated memory to MongoDB
+      // Save memory
       if (aiData.memoryUpdate) {
         const newMemory = {
           ...memory,
@@ -83,7 +80,7 @@ export default function StockCard({ stock }) {
               date: new Date(),
               outcome: "PENDING",
             },
-          ].slice(-20), // keep last 20 signals only
+          ].slice(-20),
         };
 
         await fetch("/api/memory", {
@@ -94,9 +91,7 @@ export default function StockCard({ stock }) {
       }
 
       toast.success(
-        hasMemory
-          ? "⚡ Quick analysis done!"
-          : "🧠 Deep analysis done! Memory saved.",
+        hasMemory ? "⚡ Quick analysis done!" : "🧠 Deep analysis done!",
       );
     } catch (err) {
       console.error(err);
@@ -174,9 +169,15 @@ export default function StockCard({ stock }) {
       </div>
 
       {signal?.memoryUpdate && (
-        <div className="bg-zinc-800/50 rounded-lg px-3 py-2 text-xs text-zinc-400 border border-zinc-700/50">
-          🧠{" "}
-          <span className="text-zinc-300">{signal.memoryUpdate.character}</span>
+        <div className="bg-zinc-800/50 rounded-lg px-3 py-2 text-xs text-zinc-400 border border-zinc-700/50 flex justify-between items-center">
+          <span>🧠 {signal.memoryUpdate.character}</span>
+          {memory?.winRate && (
+            <span
+              className={`font-bold ${memory.winRate >= 50 ? "text-emerald-400" : "text-red-400"}`}
+            >
+              {memory.winRate}% WR
+            </span>
+          )}
         </div>
       )}
 
@@ -193,6 +194,31 @@ export default function StockCard({ stock }) {
               Confidence: {signal.confidence}/10
             </span>
           </div>
+          {signal && marketContext && (
+            <div className="flex gap-2 text-xs flex-wrap">
+              <span
+                className={`px-2 py-0.5 rounded-full ${
+                  marketContext.nifty?.change >= 0
+                    ? "bg-emerald-500/20 text-emerald-400"
+                    : "bg-red-500/20 text-red-400"
+                }`}
+              >
+                NIFTY {marketContext.nifty?.change >= 0 ? "▲" : "▼"}
+                {Math.abs(marketContext.nifty?.change || 0).toFixed(2)}%
+              </span>
+              <span
+                className={`px-2 py-0.5 rounded-full ${
+                  marketContext.sector?.change >= 0
+                    ? "bg-emerald-500/20 text-emerald-400"
+                    : "bg-red-500/20 text-red-400"
+                }`}
+              >
+                {marketContext.sector?.name}{" "}
+                {marketContext.sector?.change >= 0 ? "▲" : "▼"}
+                {Math.abs(marketContext.sector?.change || 0).toFixed(2)}%
+              </span>
+            </div>
+          )}
           <p className="text-sm text-zinc-300">{signal.reason}</p>
           <div className="flex gap-3 text-xs">
             <span className="text-red-400">Stop Loss: ₹{signal.stopLoss}</span>
