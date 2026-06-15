@@ -100,47 +100,51 @@ const useTradingStore = create(
       sellStock: async (symbol, quantity, price) => {
         const { balance, portfolio, tradeLog } = get();
         const holding = portfolio.find((p) => p.symbol === symbol);
-        if (!holding) return;
+        if (!holding) return "no_holding";
 
-        const pnl = (price - holding.avgPrice) * quantity;
+        // Prevent overselling
+        if (quantity > holding.quantity) return "oversell";
 
-        // Update DB
-        await fetch(`/api/portfolio?symbol=${symbol}&quantity=${quantity}`, {
-          method: "DELETE",
-        });
+        const actualQuantity = quantity;
+        const pnl = (price - holding.avgPrice) * actualQuantity;
+
+        const newPortfolio =
+          holding.quantity === actualQuantity
+            ? portfolio.filter((p) => p.symbol !== symbol)
+            : portfolio.map((p) =>
+                p.symbol === symbol
+                  ? { ...p, quantity: p.quantity - actualQuantity }
+                  : p,
+              );
+
+        await fetch(
+          `/api/portfolio?symbol=${symbol}&quantity=${actualQuantity}`,
+          { method: "DELETE" },
+        );
         await fetch("/api/trades", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             symbol,
             type: "SELL",
-            quantity,
+            quantity: actualQuantity,
             price,
-            total: quantity * price,
+            total: actualQuantity * price,
             pnl,
           }),
         });
 
-        const newPortfolio =
-          holding.quantity === quantity
-            ? portfolio.filter((p) => p.symbol !== symbol)
-            : portfolio.map((p) =>
-                p.symbol === symbol
-                  ? { ...p, quantity: p.quantity - quantity }
-                  : p,
-              );
-
         set({
-          balance: balance + quantity * price,
+          balance: balance + actualQuantity * price,
           portfolio: newPortfolio,
           tradeLog: [
             {
               id: Date.now(),
               symbol,
               type: "SELL",
-              quantity,
+              quantity: actualQuantity,
               price,
-              total: quantity * price,
+              total: actualQuantity * price,
               pnl,
               time: new Date().toLocaleString(),
             },

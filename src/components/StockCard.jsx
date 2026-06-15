@@ -14,15 +14,17 @@ export default function StockCard({ stock }) {
 
   const holding = portfolio.find((p) => p.symbol === stock.symbol);
   const [marketContext, setMarketContext] = useState(null);
+  const [memory, setMemory] = useState(null);
 
   const analyzeStock = async () => {
     setLoading(true);
     try {
       const memoryRes = await fetch(`/api/memory?symbol=${stock.symbol}`);
-      const memory = await memoryRes.json();
-      const hasMemory = memory && memory.lastAnalysis;
+      const memoryData = await memoryRes.json();
+      setMemory(memoryData);
+      const hasMemory = memoryData && memoryData.lastAnalysis;
 
-      // Always fetch market context + news, chart only if no memory
+      // Always fetch market context + news, chart only if no memoryData
       const fetchPromises = [
         fetch(`/api/news?symbol=${stock.symbol}`),
         fetch(`/api/market-context?symbol=${stock.symbol}`),
@@ -44,7 +46,7 @@ export default function StockCard({ stock }) {
           stockData: stock,
           news: newsData,
           chartData,
-          memory: hasMemory ? memory : null,
+          memory: hasMemory ? memoryData : null,
           marketContext: marketContextData,
         }),
       });
@@ -56,15 +58,16 @@ export default function StockCard({ stock }) {
       // Save memory
       if (aiData.memoryUpdate) {
         const newMemory = {
-          ...memory,
+          ...memoryData,
           character: aiData.memoryUpdate.character,
           behavior: aiData.memoryUpdate.behavior,
           keyLevels: aiData.memoryUpdate.keyLevels,
           lastAnalysis: {
             signal: aiData.signal,
             confidence: aiData.confidence,
-            rsi: chartData?.indicators?.rsi || memory?.lastAnalysis?.rsi,
-            trend: chartData?.indicators?.trend || memory?.lastAnalysis?.trend,
+            rsi: chartData?.indicators?.rsi || memoryData?.lastAnalysis?.rsi,
+            trend:
+              chartData?.indicators?.trend || memoryData?.lastAnalysis?.trend,
             reason: aiData.reason,
             stopLoss: aiData.stopLoss,
             target: aiData.target,
@@ -72,7 +75,7 @@ export default function StockCard({ stock }) {
             date: new Date(),
           },
           signalHistory: [
-            ...(memory?.signalHistory || []),
+            ...(memoryData?.signalHistory || []),
             {
               signal: aiData.signal,
               confidence: aiData.confidence,
@@ -270,8 +273,15 @@ export default function StockCard({ stock }) {
         <input
           type="number"
           min={1}
+          max={holding ? holding.quantity : undefined}
           value={quantity}
-          onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+          onChange={(e) => {
+            const val = parseInt(e.target.value);
+            if (isNaN(val) || val < 1) return setQuantity(1);
+            if (holding && val > holding.quantity)
+              return setQuantity(holding.quantity);
+            setQuantity(val);
+          }}
           className="w-16 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2 text-white text-sm text-center focus:outline-none focus:border-zinc-500"
         />
         <button
@@ -291,9 +301,15 @@ export default function StockCard({ stock }) {
           Buy
         </button>
         <button
-          onClick={() =>
-            holding && sellStock(stock.symbol, quantity, stock.price)
-          }
+          onClick={async () => {
+            if (!holding) return toast.error("No holding to sell");
+            const result = await sellStock(stock.symbol, quantity, stock.price);
+            if (result === "oversell")
+              return toast.error(`You only have ${holding.quantity} qty!`);
+            toast.success(
+              `Sold ${quantity} × ${stock.symbol?.replace(".NS", "")}`,
+            );
+          }}
           disabled={!holding}
           className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium py-2 rounded-lg transition-colors"
         >
