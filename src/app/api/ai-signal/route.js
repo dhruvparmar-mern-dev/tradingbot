@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 export async function POST(request) {
-  const { stockData, news, chartData, memory, marketContext } =
+  const { stockData, news, chartData, memory, marketContext, tradingMode } =
     await request.json();
 
   const newsText =
@@ -23,6 +23,24 @@ Rules:
 - If sector is BULLISH and stock is up, strong confirmation
 `
     : "";
+
+  const modeText =
+    tradingMode === "intraday"
+      ? `
+TRADING MODE: INTRADAY
+- Position must be closed by 3:15 PM IST today
+- Use tighter stop loss (0.3-0.5% from entry)
+- Target should be realistic for same day (0.5-1%)
+- High volume confirmation is mandatory for intraday
+- Avoid entry after 2:00 PM IST
+`
+      : `
+TRADING MODE: SWING
+- Can hold position for 2-5 days
+- Wider stop loss acceptable (1-2% from entry)
+- Target can be 3-5% move
+- Volume less critical than trend
+`;
 
   const indicators = chartData?.indicators;
   const technicalText = indicators
@@ -61,6 +79,8 @@ ${newsText}
 
 ${marketText}
 
+${modeText}
+
 Based on your memory + today's update, give a quick decision.
 Respond in this exact JSON format only, no extra text:
 {
@@ -96,6 +116,8 @@ RECENT NEWS:
 ${newsText}
 
 ${marketText}
+
+${modeText}
 
 Respond in this exact JSON format only, no extra text:
 {

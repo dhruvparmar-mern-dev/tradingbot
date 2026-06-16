@@ -14,6 +14,7 @@ import {
   Bar,
 } from "recharts";
 import { toast } from "sonner";
+import CandlestickChart from "@/components/CandlestickChart";
 
 export default function StockDetail() {
   const { symbol } = useParams();
@@ -26,31 +27,82 @@ export default function StockDetail() {
   const [analyzing, setAnalyzing] = useState(false);
   const [quantity, setQuantity] = useState(1);
 
-  const { buyStock, sellStock, portfolio, balance } = useTradingStore();
+  const { buyStock, sellStock, portfolio, balance, tradingMode } =
+    useTradingStore();
   const holding = portfolio.find(
     (p) => p.symbol === decodeURIComponent(symbol),
   );
 
+  const [hydrated, setHydrated] = useState(false);
+
   useEffect(() => {
-    fetchAll();
-  }, [symbol]);
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (hydrated) fetchAll();
+  }, [symbol, tradingMode, hydrated]);
+
+  // Refresh chart data periodically
+  useEffect(() => {
+    if (!hydrated) return;
+
+    // Refresh chart every 5 mins for swing, every 1 min for intraday
+    const interval = setInterval(
+      () => {
+        fetchChartOnly(); // separate function, don't refetch everything
+      },
+      tradingMode === "intraday" ? 60000 : 300000,
+    );
+
+    return () => clearInterval(interval);
+  }, [tradingMode, hydrated]);
+
+  // Add this separate function:
+  const fetchChartOnly = async () => {
+    try {
+      const kiteRes = await fetch("/api/kite/status");
+      const { connected: kiteConnected } = await kiteRes.json();
+
+      const chartEndpoint = kiteConnected
+        ? `/api/kite/historical?symbol=${symbol}&mode=${tradingMode}`
+        : `/api/chart?symbol=${symbol}`;
+
+      const res = await fetch(chartEndpoint);
+      const chartData = await res.json();
+      if (!chartData.error) setChart(chartData);
+    } catch (err) {
+      console.error("Chart refresh error:", err);
+    }
+  };
 
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [stockRes, chartRes, newsRes] = await Promise.all([
-        fetch(`/api/stock?symbol=${symbol}`),
-        fetch(`/api/chart?symbol=${symbol}`),
+      const kiteRes = await fetch("/api/kite/status");
+      const { connected: kiteConnected } = await kiteRes.json();
+
+      const stockEndpoint = kiteConnected
+        ? `/api/kite/quote?symbol=${symbol}`
+        : `/api/stock?symbol=${symbol}`;
+
+      const [stockRes, newsRes] = await Promise.all([
+        fetch(stockEndpoint),
         fetch(`/api/news?symbol=${symbol}`),
       ]);
-      const [stockData, chartData, newsData] = await Promise.all([
+
+      const [stockData, newsData] = await Promise.all([
         stockRes.json(),
-        chartRes.json(),
         newsRes.json(),
       ]);
+
       setStock(stockData);
-      setChart(chartData);
       setNews(newsData);
+
+      // Fetch chart separately
+      fetchChartOnly();
+
+      console.log("Chart data:", chartData);
     } catch (err) {
       toast.error("Failed to load stock data");
     }
@@ -63,7 +115,12 @@ export default function StockDetail() {
       const res = await fetch("/api/ai-signal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stockData: stock, news, chartData: chart }),
+        body: JSON.stringify({
+          stockData: stock,
+          news,
+          chartData: chart,
+          tradingMode,
+        }),
       });
       const data = await res.json();
       if (!res.ok) return toast.error(data.error || "Analysis failed");
@@ -135,6 +192,15 @@ export default function StockDetail() {
         {/* Stock name + quick stats */}
         <div>
           <p className="text-zinc-400 text-sm mb-4">{stock.name}</p>
+          <span
+            className={`text-xs px-2 py-0.5 rounded-full ${
+              tradingMode === "intraday"
+                ? "bg-orange-500/20 text-orange-400"
+                : "bg-blue-500/20 text-blue-400"
+            }`}
+          >
+            {tradingMode === "intraday" ? "⚡ Intraday" : "📅 Swing"}
+          </span>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
               { label: "Open", value: `₹${stock.open?.toFixed(2)}` },
@@ -173,7 +239,7 @@ export default function StockDetail() {
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
             <div className="flex justify-between items-center mb-4">
               <h2 className="font-semibold text-white">
-                Price Chart (30 Days)
+                {tradingMode === "intraday" ? "5 Min Chart" : "30 Day Chart"}
               </h2>
               <div className="flex gap-3 text-xs">
                 <span className="text-red-400">
@@ -184,61 +250,12 @@ export default function StockDetail() {
                 </span>
               </div>
             </div>
-            <ResponsiveContainer width="100%" height={300}>
-              <ComposedChart data={chart.candles}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fill: "#71717a", fontSize: 10 }}
-                  tickLine={false}
-                  interval={4}
-                />
-                <YAxis
-                  tick={{ fill: "#71717a", fontSize: 10 }}
-                  tickLine={false}
-                  domain={["auto", "auto"]}
-                  tickFormatter={(v) => `₹${v}`}
-                />
-                <Tooltip
-                  contentStyle={{
-                    background: "#18181b",
-                    border: "1px solid #3f3f46",
-                    borderRadius: "8px",
-                    fontSize: "12px",
-                  }}
-                  labelStyle={{ color: "#a1a1aa" }}
-                  formatter={(value, name) => [
-                    `₹${parseFloat(value).toFixed(2)}`,
-                    name,
-                  ]}
-                />
-                <ReferenceLine
-                  y={parseFloat(chart.indicators?.support)}
-                  stroke="#f87171"
-                  strokeDasharray="4 4"
-                  label={{ value: "Support", fill: "#f87171", fontSize: 10 }}
-                />
-                <ReferenceLine
-                  y={parseFloat(chart.indicators?.resistance)}
-                  stroke="#34d399"
-                  strokeDasharray="4 4"
-                  label={{ value: "Resistance", fill: "#34d399", fontSize: 10 }}
-                />
-                <Bar
-                  dataKey="volume"
-                  fill="#3f3f46"
-                  opacity={0.3}
-                  yAxisId={0}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="close"
-                  stroke="#60a5fa"
-                  strokeWidth={2}
-                  dot={false}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
+            <CandlestickChart
+              candles={chart.candles}
+              support={chart.indicators?.support}
+              resistance={chart.indicators?.resistance}
+              mode={tradingMode}
+            />
           </div>
         )}
 

@@ -9,7 +9,7 @@ export default function StockCard({ stock }) {
   const [news, setNews] = useState([]);
   const [signal, setSignal] = useState(null);
   const [quantity, setQuantity] = useState(1);
-  const { buyStock, sellStock, portfolio, removeFromWatchlist } =
+  const { buyStock, sellStock, portfolio, removeFromWatchlist, tradingMode } =
     useTradingStore();
 
   const holding = portfolio.find((p) => p.symbol === stock.symbol);
@@ -48,6 +48,7 @@ export default function StockCard({ stock }) {
           chartData,
           memory: hasMemory ? memoryData : null,
           marketContext: marketContextData,
+          tradingMode,
         }),
       });
 

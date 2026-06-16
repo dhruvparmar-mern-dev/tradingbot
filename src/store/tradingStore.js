@@ -13,7 +13,7 @@ const useTradingStore = create(
       autoTrade: false,
       minConfidence: 7,
       maxPerTrade: 10000,
-
+      tradingMode: "swing",
       // Load everything from DB on app start
       init: async () => {
         if (get().initialized) return;
@@ -179,6 +179,7 @@ const useTradingStore = create(
       setAutoTrade: (val) => set({ autoTrade: val }),
       setMinConfidence: (val) => set({ minConfidence: val }),
       setMaxPerTrade: (val) => set({ maxPerTrade: val }),
+      setTradingMode: (mode) => set({ tradingMode: mode }),
     }),
     {
       name: "trading-settings", // localStorage key
@@ -188,6 +189,7 @@ const useTradingStore = create(
         minConfidence: state.minConfidence,
         maxPerTrade: state.maxPerTrade,
         balance: state.balance,
+        tradingMode: state.tradingMode,
       }),
     },
   ),

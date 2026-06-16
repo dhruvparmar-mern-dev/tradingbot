@@ -1,11 +1,14 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import useTradingStore from "@/store/tradingStore";
 import StockCard from "./StockCard";
 import TradeLog from "./TradeLog";
 import { toast } from "sonner";
 import useAutoTrader from "@/hooks/useAutoTrader";
 import AutoTradeSettings from "./AutoTradeSettings";
+import KiteConnect from "./KiteConnect";
+import useKiteWebSocket from "@/hooks/useKiteWebSocket";
+import MarketOverview from "./MarketOverview";
 
 export default function Dashboard() {
   const [search, setSearch] = useState("");
@@ -13,8 +16,15 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("watchlist");
   const [loadingPrices, setLoadingPrices] = useState(false);
 
-  const { balance, portfolio, watchlist, tradeLog, addToWatchlist } =
-    useTradingStore();
+  const {
+    balance,
+    portfolio,
+    watchlist,
+    tradeLog,
+    addToWatchlist,
+    tradingMode,
+    setTradingMode,
+  } = useTradingStore();
 
   const totalInvested = portfolio.reduce(
     (sum, p) => sum + (p.avgPrice || 0) * (p.quantity || 0),
@@ -28,10 +38,18 @@ export default function Dashboard() {
 
   const refreshPrices = async (stocks, type = "watchlist") => {
     if (!stocks || stocks.length === 0) return [];
+
+    // Check Kite first
+    const kiteRes = await fetch("/api/kite/status");
+    const { connected: kiteConnected } = await kiteRes.json();
+
     const updated = await Promise.all(
       stocks.map(async (s) => {
         try {
-          const res = await fetch(`/api/stock?symbol=${s.symbol}`);
+          const endpoint = kiteConnected
+            ? `/api/kite/quote?symbol=${s.symbol}`
+            : `/api/stock?symbol=${s.symbol}`;
+          const res = await fetch(endpoint);
           const data = await res.json();
           return { ...s, ...data };
         } catch {
@@ -81,6 +99,7 @@ export default function Dashboard() {
   };
 
   useAutoTrader();
+  useKiteWebSocket();
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -92,6 +111,26 @@ export default function Dashboard() {
           <span className="text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-full">
             Paper Trading
           </span>
+          <Suspense fallback={null}>
+            <KiteConnect />
+          </Suspense>
+          <div className="flex gap-1 bg-zinc-800 rounded-lg p-1">
+            {["swing", "intraday"].map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setTradingMode(mode)}
+                className={`px-3 py-1 rounded-md text-xs font-medium capitalize transition-colors ${
+                  tradingMode === mode
+                    ? mode === "intraday"
+                      ? "bg-orange-500 text-white"
+                      : "bg-blue-600 text-white"
+                    : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                {mode === "intraday" ? "⚡ Intraday" : "📅 Swing"}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="text-right">
           <div className="text-xs text-zinc-500">Balance</div>
@@ -100,6 +139,8 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      <MarketOverview />
 
       <div className="max-w-6xl mx-auto px-6 py-6 flex flex-col gap-6">
         {/* Stats */}

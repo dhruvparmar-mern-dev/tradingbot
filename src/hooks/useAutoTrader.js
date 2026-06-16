@@ -8,14 +8,12 @@ export default function useAutoTrader() {
 
   useEffect(() => {
     const checkAndTrade = async () => {
-      // Prevent overlapping calls
       if (isRunningRef.current) return;
       isRunningRef.current = true;
 
       try {
         const {
           watchlist,
-          portfolio,
           autoTrade,
           minConfidence,
           maxPerTrade,
@@ -25,41 +23,60 @@ export default function useAutoTrader() {
 
         if (!watchlist.length) return;
 
-        // 1. Refresh all prices
-        const updatedPrices = await Promise.all(
-          watchlist.map(async (s) => {
-            try {
-              const res = await fetch(`/api/stock?symbol=${s.symbol}`);
-              const data = await res.json();
-              return {
-                symbol: s.symbol,
-                price: data.price,
-                high: data.high,
-                low: data.low,
-              };
-            } catch {
-              return null;
-            }
-          }),
-        );
+        // Check Kite status first
+        const kiteRes = await fetch("/api/kite/status");
+        const { connected: kiteConnected } = await kiteRes.json();
 
-        const validPrices = updatedPrices.filter(Boolean);
+        let validPrices = [];
 
-        // Update prices in store
-        if (validPrices.length > 0) {
-          useTradingStore.setState((state) => ({
-            watchlist: state.watchlist.map((s) => {
-              const updated = validPrices.find((p) => p.symbol === s.symbol);
-              return updated ? { ...s, ...updated } : s;
+        if (kiteConnected) {
+          // WebSocket already updating store — just read current prices
+          validPrices = useTradingStore
+            .getState()
+            .watchlist.filter((s) => s.price)
+            .map((s) => ({
+              symbol: s.symbol,
+              price: s.price,
+              high: s.high,
+              low: s.low,
+            }));
+        } else {
+          // Poll Yahoo Finance every 30 sec
+          const results = await Promise.all(
+            watchlist.map(async (s) => {
+              try {
+                const res = await fetch(`/api/stock?symbol=${s.symbol}`);
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                return {
+                  symbol: s.symbol,
+                  price: data.price,
+                  high: data.high,
+                  low: data.low,
+                };
+              } catch {
+                return null;
+              }
             }),
-            portfolio: state.portfolio.map((s) => {
-              const updated = validPrices.find((p) => p.symbol === s.symbol);
-              return updated ? { ...s, price: updated.price } : s;
-            }),
-          }));
+          );
+          validPrices = results.filter(Boolean);
+
+          // Update store with fresh Yahoo prices
+          if (validPrices.length > 0) {
+            useTradingStore.setState((state) => ({
+              watchlist: state.watchlist.map((s) => {
+                const updated = validPrices.find((p) => p.symbol === s.symbol);
+                return updated ? { ...s, ...updated } : s;
+              }),
+              portfolio: state.portfolio.map((s) => {
+                const updated = validPrices.find((p) => p.symbol === s.symbol);
+                return updated ? { ...s, price: updated.price } : s;
+              }),
+            }));
+          }
         }
 
-        // 2. Check stop loss / target for holdings
+        // Check stop loss / target for holdings
         const currentPortfolio = useTradingStore.getState().portfolio;
         for (const holding of currentPortfolio) {
           const priceData = validPrices.find(
@@ -109,7 +126,7 @@ export default function useAutoTrader() {
           }
         }
 
-        // 3. Auto buy if enabled
+        // Auto buy if enabled
         if (autoTrade) {
           for (const stock of watchlist) {
             const alreadyHolding = useTradingStore
@@ -148,20 +165,41 @@ export default function useAutoTrader() {
               console.error("Auto buy error:", err);
             }
           }
+          if (tradingMode === "intraday") {
+            const now = new Date();
+            const hours = now.getHours();
+            const minutes = now.getMinutes();
+            const isForceExitTime = hours === 15 && minutes >= 15;
+
+            if (isForceExitTime) {
+              const { portfolio, sellStock } = useTradingStore.getState();
+              for (const holding of portfolio) {
+                const priceData = validPrices.find(
+                  (p) => p.symbol === holding.symbol,
+                );
+                if (!priceData) continue;
+                await sellStock(
+                  holding.symbol,
+                  holding.quantity,
+                  priceData.price,
+                );
+                toast.warning(
+                  `⏰ 3:15 PM! Force closed ${holding.symbol?.replace(".NS", "")} at ₹${priceData.price}`,
+                );
+              }
+            }
+          }
         }
       } finally {
         isRunningRef.current = false;
       }
     };
 
-    // Run immediately once
     checkAndTrade();
-
-    // Then every 30 seconds
     intervalRef.current = setInterval(checkAndTrade, 30000);
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, []); // empty deps — reads store directly via getState()
+  }, []);
 }
