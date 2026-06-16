@@ -1,6 +1,11 @@
 "use client";
 import { useEffect, useRef } from "react";
-import { createChart } from "lightweight-charts";
+import {
+  CandlestickSeries,
+  createChart,
+  HistogramSeries,
+  LineSeries,
+} from "lightweight-charts";
 
 export default function CandlestickChart({
   candles,
@@ -42,7 +47,7 @@ export default function CandlestickChart({
     chartRef.current = chart;
 
     // Candlestick series
-    const candleSeries = chart.addCandlestickSeries({
+    const candleSeries = chart.addSeries(CandlestickSeries, {
       upColor: "#22c55e",
       downColor: "#ef4444",
       borderUpColor: "#22c55e",
@@ -52,7 +57,7 @@ export default function CandlestickChart({
     });
 
     // Volume series
-    const volumeSeries = chart.addHistogramSeries({
+    const volumeSeries = chart.addSeries(HistogramSeries, {
       color: "#3f3f46",
       priceFormat: { type: "volume" },
       priceScaleId: "volume",
@@ -93,7 +98,7 @@ export default function CandlestickChart({
 
     // Support line
     if (support) {
-      const supportLine = chart.addLineSeries({
+      const supportLine = chart.addSeries(LineSeries, {
         color: "#f87171",
         lineWidth: 1,
         lineStyle: 2, // dashed
@@ -110,7 +115,7 @@ export default function CandlestickChart({
 
     // Resistance line
     if (resistance) {
-      const resistanceLine = chart.addLineSeries({
+      const resistanceLine = chart.addSeries(LineSeries, {
         color: "#34d399",
         lineWidth: 1,
         lineStyle: 2, // dashed
