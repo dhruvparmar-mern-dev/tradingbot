@@ -26,9 +26,16 @@ export default function TradeLog() {
             </span>
             <div>
               <div className="text-white font-medium text-sm">
-                {trade.symbol}
+                {trade.symbol?.replace(".NS", "").replace(".BO", "")}
               </div>
-              <div className="text-zinc-500 text-xs">{trade.time}</div>
+              <div className="text-zinc-500 text-xs">
+                {new Date(trade.time).toLocaleString("en-IN", {
+                  day: "2-digit",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </div>
             </div>
           </div>
           <div className="text-right">

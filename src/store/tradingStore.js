@@ -28,7 +28,16 @@ const useTradingStore = create(
             portRes.json(),
             tradeRes.json(),
           ]);
-          set({ watchlist, portfolio, tradeLog, initialized: true });
+
+          // Calculate balance from trade history
+          const startingBalance = 100000;
+          const balance = tradeLog.reduce((bal, trade) => {
+            if (trade.type === "BUY") return bal - trade.total;
+            if (trade.type === "SELL") return bal + trade.total;
+            return bal;
+          }, startingBalance);
+
+          set({ watchlist, portfolio, tradeLog, balance, initialized: true });
         } catch (err) {
           console.error("Init error:", err);
         }
@@ -188,7 +197,7 @@ const useTradingStore = create(
         autoTrade: state.autoTrade,
         minConfidence: state.minConfidence,
         maxPerTrade: state.maxPerTrade,
-        balance: state.balance,
+        // balance: state.balance,
         tradingMode: state.tradingMode,
       }),
     },
