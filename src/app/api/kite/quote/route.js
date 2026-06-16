@@ -21,16 +21,21 @@ export async function GET(request) {
     const quote = await kite.getQuote([`NSE:${cleanSymbol}`]);
     const data = quote[`NSE:${cleanSymbol}`];
 
+    const lastPrice = data.last_price;
+    const prevClose = data.ohlc.close;
+    const changeAmount = lastPrice - prevClose;
+    const changePercent = (changeAmount / prevClose) * 100;
+
     return NextResponse.json({
       symbol,
-      price: data.last_price,
-      change: data.change,
-      changeAmount: data.net_change,
+      price: lastPrice,
+      change: parseFloat(changePercent.toFixed(2)),
+      changeAmount: parseFloat(changeAmount.toFixed(2)),
       high: data.ohlc.high,
       low: data.ohlc.low,
       open: data.ohlc.open,
-      prevClose: data.ohlc.close,
-      volume: data.volume_traded,
+      prevClose: prevClose,
+      volume: data.volume_traded || data.volume || 0,
       fiftyTwoWeekHigh: data.upper_circuit_limit || null,
       fiftyTwoWeekLow: data.lower_circuit_limit || null,
     });
