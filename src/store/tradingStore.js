@@ -21,7 +21,6 @@ const useTradingStore = create((set, get) => ({
         fetch("/api/portfolio"),
         fetch("/api/trades"),
       ]);
-
       const [user, watchlist, portfolio, tradeLog] = await Promise.all([
         userRes.json(),
         watchRes.json(),
@@ -29,19 +28,11 @@ const useTradingStore = create((set, get) => ({
         tradeRes.json(),
       ]);
 
-      // Calculate balance from trades
-      const startingBalance = 100000;
-      const balance = tradeLog.reduce((bal, trade) => {
-        if (trade.type === "BUY") return bal - (trade.total || 0);
-        if (trade.type === "SELL") return bal + (trade.total || 0);
-        return bal;
-      }, startingBalance);
-
       set({
         watchlist: Array.isArray(watchlist) ? watchlist : [],
         portfolio: Array.isArray(portfolio) ? portfolio : [],
         tradeLog: Array.isArray(tradeLog) ? tradeLog : [],
-        balance,
+        balance: user.balance, // ← directly from DB now, single source of truth
         autoTrade: user.autoTrade ?? false,
         minConfidence: user.minConfidence ?? 7,
         maxPerTrade: user.maxPerTrade ?? 10000,
@@ -91,44 +82,23 @@ const useTradingStore = create((set, get) => ({
   },
 
   buyStock: async (stock, quantity, price) => {
-    const cost = quantity * price;
-    const { balance } = get();
-    if (cost > balance) return "insufficient";
-
-    const newBalance = balance - cost;
-
-    // Update DB
-    await Promise.all([
-      fetch("/api/portfolio", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          symbol: stock.symbol,
-          name: stock.name,
-          quantity,
-          price,
-        }),
+    const res = await fetch("/api/trade", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "BUY",
+        symbol: stock.symbol,
+        name: stock.name,
+        quantity,
+        price,
       }),
-      fetch("/api/trades", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          symbol: stock.symbol,
-          type: "BUY",
-          quantity,
-          price,
-          total: cost,
-        }),
-      }),
-      // fetch("/api/user/settings", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({ balance: newBalance }),
-      // }),
-    ]);
+    });
+    const data = await res.json();
+    if (!res.ok) return data.error; // 'insufficient' etc
 
     const { portfolio, tradeLog } = get();
     const existing = portfolio.find((p) => p.symbol === stock.symbol);
+    const cost = quantity * price;
     const newPortfolio = existing
       ? portfolio.map((p) =>
           p.symbol === stock.symbol
@@ -143,33 +113,23 @@ const useTradingStore = create((set, get) => ({
       : [...portfolio, { ...stock, quantity, avgPrice: price }];
 
     set({
-      balance: newBalance,
+      balance: data.balance, // ← directly from backend, no manual calc
       portfolio: newPortfolio,
-      tradeLog: [
-        {
-          id: Date.now(),
-          symbol: stock.symbol,
-          type: "BUY",
-          quantity,
-          price,
-          total: cost,
-          time: new Date().toISOString(),
-        },
-        ...tradeLog,
-      ],
+      tradeLog: [{ ...data.trade, time: data.trade.time }, ...tradeLog],
     });
   },
 
   sellStock: async (symbol, quantity, price) => {
-    const { balance, portfolio, tradeLog } = get();
+    const res = await fetch("/api/trade", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "SELL", symbol, quantity, price }),
+    });
+    const data = await res.json();
+    if (!res.ok) return data.error; // 'oversell', 'no_holding'
+
+    const { portfolio, tradeLog } = get();
     const holding = portfolio.find((p) => p.symbol === symbol);
-    if (!holding) return "no_holding";
-    if (quantity > holding.quantity) return "oversell";
-
-    const total = quantity * price;
-    const pnl = (price - holding.avgPrice) * quantity;
-    const newBalance = balance + total;
-
     const newPortfolio =
       holding.quantity === quantity
         ? portfolio.filter((p) => p.symbol !== symbol)
@@ -177,45 +137,10 @@ const useTradingStore = create((set, get) => ({
             p.symbol === symbol ? { ...p, quantity: p.quantity - quantity } : p,
           );
 
-    await Promise.all([
-      fetch(`/api/portfolio?symbol=${symbol}&quantity=${quantity}`, {
-        method: "DELETE",
-      }),
-      fetch("/api/trades", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          symbol,
-          type: "SELL",
-          quantity,
-          price,
-          total,
-          pnl,
-        }),
-      }),
-      fetch("/api/user/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ balance: newBalance }),
-      }),
-    ]);
-
     set({
-      balance: newBalance,
+      balance: data.balance, // ← directly from backend
       portfolio: newPortfolio,
-      tradeLog: [
-        {
-          id: Date.now(),
-          symbol,
-          type: "SELL",
-          quantity,
-          price,
-          total,
-          pnl,
-          time: new Date().toISOString(),
-        },
-        ...tradeLog,
-      ],
+      tradeLog: [{ ...data.trade, time: data.trade.time }, ...tradeLog],
     });
   },
 

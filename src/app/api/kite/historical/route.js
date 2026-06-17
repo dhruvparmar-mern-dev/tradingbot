@@ -12,6 +12,7 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get("symbol");
   const mode = searchParams.get("mode") || "swing"; // swing or intraday
+  const range = searchParams.get("range"); // '1D', '5D', '1M', '3M', '6M', '1Y'
 
   const session = await KiteSession.findOne({ userId: "default" });
   if (!session?.accessToken) {
@@ -43,14 +44,23 @@ export async function GET(request) {
     let fromDate, interval;
 
     if (mode === "intraday") {
-      // Last 5 days, 5 min candles
       fromDate = new Date(now);
-      fromDate.setDate(fromDate.getDate() - 5);
+      const days = range === "1D" ? 1 : range === "5D" ? 5 : 5;
+      fromDate.setDate(fromDate.getDate() - days);
       interval = "5minute";
     } else {
-      // Last 3 months, daily candles
       fromDate = new Date(now);
-      fromDate.setMonth(fromDate.getMonth() - 3);
+      const months =
+        range === "1M"
+          ? 1
+          : range === "3M"
+            ? 3
+            : range === "6M"
+              ? 6
+              : range === "1Y"
+                ? 12
+                : 3;
+      fromDate.setMonth(fromDate.getMonth() - months);
       interval = "day";
     }
 

@@ -1,30 +1,19 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+import { useState } from "react";
 import useTradingStore from "@/store/tradingStore";
 import StockCard from "./StockCard";
 import TradeLog from "./TradeLog";
 import { toast } from "sonner";
-import useAutoTrader from "@/hooks/useAutoTrader";
-import AutoTradeSettings from "./AutoTradeSettings";
-import KiteConnect from "./KiteConnect";
-import useKiteWebSocket from "@/hooks/useKiteWebSocket";
 import MarketOverview from "./MarketOverview";
+import AIPicks from "./AIPicks";
 
 export default function Dashboard() {
   const [search, setSearch] = useState("");
   const [searching, setSearching] = useState(false);
   const [activeTab, setActiveTab] = useState("watchlist");
-  const [loadingPrices, setLoadingPrices] = useState(false);
 
-  const {
-    balance,
-    portfolio,
-    watchlist,
-    tradeLog,
-    addToWatchlist,
-    tradingMode,
-    setTradingMode,
-  } = useTradingStore();
+  const { portfolio, watchlist, tradeLog, addToWatchlist, loadingPrices } =
+    useTradingStore();
 
   const totalInvested = portfolio.reduce(
     (sum, p) => sum + (p.avgPrice || 0) * (p.quantity || 0),
@@ -36,55 +25,9 @@ export default function Dashboard() {
   );
   const totalPnL = totalValue - totalInvested;
 
-  // Also show realized P&L from closed trades:
   const realizedPnL = tradeLog
     .filter((t) => t.type === "SELL" && t.pnl)
     .reduce((sum, t) => sum + t.pnl, 0);
-
-  const refreshPrices = async (stocks, type = "watchlist") => {
-    if (!stocks || stocks.length === 0) return [];
-
-    // Check Kite first
-    const kiteRes = await fetch("/api/kite/status");
-    const { connected: kiteConnected } = await kiteRes.json();
-
-    const updated = await Promise.all(
-      stocks.map(async (s) => {
-        try {
-          const endpoint = kiteConnected
-            ? `/api/kite/quote?symbol=${s.symbol}`
-            : `/api/stock?symbol=${s.symbol}`;
-          const res = await fetch(endpoint);
-          const data = await res.json();
-          return { ...s, ...data };
-        } catch {
-          return s;
-        }
-      }),
-    );
-    if (type === "watchlist") useTradingStore.setState({ watchlist: updated });
-    if (type === "portfolio") useTradingStore.setState({ portfolio: updated });
-    return updated;
-  };
-
-  useEffect(() => {
-    const initDashboard = async () => {
-      setLoadingPrices(true);
-      try {
-        await useTradingStore.getState().init();
-        const { watchlist, portfolio } = useTradingStore.getState();
-        await Promise.all([
-          refreshPrices(watchlist, "watchlist"),
-          refreshPrices(portfolio, "portfolio"),
-        ]);
-      } catch (err) {
-        toast.error("Failed to load data");
-      } finally {
-        setLoadingPrices(false);
-      }
-    };
-    initDashboard();
-  }, []);
 
   const searchStock = async () => {
     if (!search.trim()) return;
@@ -103,65 +46,12 @@ export default function Dashboard() {
     }
   };
 
-  const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    window.location.href = "/login";
-  };
-
-  useAutoTrader();
-  useKiteWebSocket();
-
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      {/* Navbar */}
-      <div className="border-b border-zinc-800 px-6 py-4 flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">📈</span>
-          <h1 className="text-lg font-bold">TradingBot</h1>
-          <span className="text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-full">
-            Paper Trading
-          </span>
-          <Suspense fallback={null}>
-            <KiteConnect />
-          </Suspense>
-          <div className="flex gap-1 bg-zinc-800 rounded-lg p-1">
-            {["swing", "intraday"].map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setTradingMode(mode)}
-                className={`px-3 py-1 rounded-md text-xs font-medium capitalize transition-colors ${
-                  tradingMode === mode
-                    ? mode === "intraday"
-                      ? "bg-orange-500 text-white"
-                      : "bg-blue-600 text-white"
-                    : "text-zinc-400 hover:text-white"
-                }`}
-              >
-                {mode === "intraday" ? "⚡ Intraday" : "📅 Swing"}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="text-right">
-            <div className="text-xs text-zinc-500">Balance</div>
-            <div className="text-lg font-bold">
-              ₹{balance.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
-            </div>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
-          >
-            Logout
-          </button>
-        </div>
-      </div>
-
-      <MarketOverview />
-
       <div className="max-w-6xl mx-auto px-6 py-6 flex flex-col gap-6">
-        {/* Stats */}
+        <MarketOverview />
+        <AIPicks />
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             {
@@ -175,7 +65,6 @@ export default function Dashboard() {
               color: "text-white",
             },
             {
-              //   label: "Total P&L",
               label: "Unrealized P&L",
               value: `${totalPnL >= 0 ? "+" : ""}₹${totalPnL.toFixed(2)}`,
               color: totalPnL >= 0 ? "text-emerald-400" : "text-red-400",
@@ -197,7 +86,6 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Search */}
         <div className="flex gap-2">
           <input
             type="text"
@@ -216,7 +104,6 @@ export default function Dashboard() {
           </button>
         </div>
 
-        {/* Tabs */}
         <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit">
           {[
             { key: "watchlist", label: `Watchlist (${watchlist.length})` },
@@ -237,14 +124,12 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Loading */}
         {loadingPrices && (
           <div className="text-center text-zinc-500 text-sm animate-pulse py-4">
             Fetching latest prices...
           </div>
         )}
 
-        {/* Tab Content */}
         {!loadingPrices &&
           activeTab === "watchlist" &&
           (watchlist.length === 0 ? (
@@ -252,7 +137,7 @@ export default function Dashboard() {
               Search and add stocks to your watchlist
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="flex flex-col gap-3">
               {watchlist.map((stock) => (
                 <StockCard key={stock.symbol} stock={stock} />
               ))}
@@ -266,7 +151,7 @@ export default function Dashboard() {
               No holdings yet. Buy some stocks!
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="flex flex-col gap-3">
               {portfolio.map((stock) => (
                 <StockCard key={stock.symbol} stock={stock} />
               ))}
@@ -283,7 +168,6 @@ export default function Dashboard() {
             <TradeLog />
           ))}
       </div>
-      <AutoTradeSettings />
     </div>
   );
 }

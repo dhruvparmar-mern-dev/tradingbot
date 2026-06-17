@@ -2,17 +2,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import useTradingStore from "@/store/tradingStore";
-import {
-  ResponsiveContainer,
-  ComposedChart,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  Line,
-  ReferenceLine,
-  Bar,
-} from "recharts";
 import { toast } from "sonner";
 import CandlestickChart from "@/components/CandlestickChart";
 
@@ -34,6 +23,7 @@ export default function StockDetail() {
   );
 
   const [hydrated, setHydrated] = useState(false);
+  const [range, setRange] = useState(tradingMode === "intraday" ? "3D" : "3M");
 
   useEffect(() => {
     setHydrated(true);
@@ -42,6 +32,14 @@ export default function StockDetail() {
   useEffect(() => {
     if (hydrated) fetchAll();
   }, [symbol, tradingMode, hydrated]);
+
+  useEffect(() => {
+    if (hydrated) fetchChartOnly();
+  }, [range]);
+
+  useEffect(() => {
+    setRange(tradingMode === "intraday" ? "3D" : "3M");
+  }, [tradingMode]);
 
   // Refresh chart data periodically
   useEffect(() => {
@@ -63,10 +61,10 @@ export default function StockDetail() {
     try {
       const kiteRes = await fetch("/api/kite/status");
       const { connected: kiteConnected } = await kiteRes.json();
-      console.log("kiteConnected:", kiteConnected, "mode:", tradingMode);
 
+      const rangeParam = range ? `&range=${range}` : "";
       const chartEndpoint = kiteConnected
-        ? `/api/kite/historical?symbol=${symbol}&mode=${tradingMode}`
+        ? `/api/kite/historical?symbol=${symbol}&mode=${tradingMode}${rangeParam}`
         : `/api/chart?symbol=${symbol}`;
 
       const res = await fetch(chartEndpoint);
@@ -102,8 +100,6 @@ export default function StockDetail() {
 
       // Fetch chart separately
       fetchChartOnly();
-
-      console.log("Chart data:", chartData);
     } catch (err) {
       toast.error("Failed to load stock data");
     }
@@ -144,6 +140,11 @@ export default function StockDetail() {
     MEDIUM: "bg-yellow-500/20 text-yellow-400",
     HIGH: "bg-red-500/20 text-red-400",
   };
+
+  const swingRanges = ["1M", "3M", "6M", "1Y"];
+  const intradayRanges = ["1D", "3D", "5D"];
+  const availableRanges =
+    tradingMode === "intraday" ? intradayRanges : swingRanges;
 
   if (loading)
     return (
@@ -250,6 +251,21 @@ export default function StockDetail() {
                   Resistance: ₹{chart.indicators?.resistance}
                 </span>
               </div>
+            </div>
+            <div className="flex gap-1 mb-3">
+              {availableRanges.map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setRange(r)}
+                  className={`text-xs px-2.5 py-1 rounded-md transition-colors ${
+                    range === r
+                      ? "bg-blue-600 text-white"
+                      : "bg-zinc-800 text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  {r}
+                </button>
+              ))}
             </div>
             <CandlestickChart
               candles={chart.candles}

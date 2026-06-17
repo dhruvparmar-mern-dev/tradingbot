@@ -15,7 +15,7 @@ export default function TradeLog() {
     <div className="flex flex-col gap-2">
       {[...tradeLog].reverse().map((trade) => (
         <div
-          key={trade.id}
+          key={trade._id}
           className="bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 flex justify-between items-center"
         >
           <div className="flex items-center gap-3">

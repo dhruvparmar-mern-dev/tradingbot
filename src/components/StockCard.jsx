@@ -1,20 +1,54 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import useTradingStore from "@/store/tradingStore";
 import { toast } from "sonner";
 import Link from "next/link";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { ExternalLink, Newspaper, RefreshCw, X } from "lucide-react";
+import { ScrollArea } from "./ui/scroll-area";
 
 export default function StockCard({ stock }) {
   const [loading, setLoading] = useState(false);
   const [news, setNews] = useState([]);
   const [signal, setSignal] = useState(null);
+  const [memory, setMemory] = useState(null);
   const [quantity, setQuantity] = useState(1);
+  const [marketContext, setMarketContext] = useState(null);
   const { buyStock, sellStock, portfolio, removeFromWatchlist, tradingMode } =
     useTradingStore();
 
   const holding = portfolio.find((p) => p.symbol === stock.symbol);
-  const [marketContext, setMarketContext] = useState(null);
-  const [memory, setMemory] = useState(null);
+
+  useEffect(() => {
+    loadExistingSignal();
+  }, [tradingMode]);
+
+  const loadExistingSignal = async () => {
+    try {
+      const res = await fetch(
+        `/api/memory?symbol=${stock.symbol}&mode=${tradingMode}`,
+      );
+      const data = await res.json();
+      if (data?.lastAnalysis?.signal) {
+        setSignal({
+          signal: data.lastAnalysis.signal,
+          confidence: data.lastAnalysis.confidence,
+          reason: data.lastAnalysis.reason,
+          stopLoss: data.lastAnalysis.stopLoss,
+          target: data.lastAnalysis.target,
+          riskLevel: data.lastAnalysis.riskLevel,
+        });
+        setMemory(data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const analyzeStock = async () => {
     setLoading(true);
@@ -26,13 +60,11 @@ export default function StockCard({ stock }) {
       setMemory(memoryData);
       const hasMemory = memoryData && memoryData.lastAnalysis;
 
-      // Always fetch market context + news, chart only if no memoryData
       const fetchPromises = [
         fetch(`/api/news?symbol=${stock.symbol}`),
         fetch(`/api/market-context?symbol=${stock.symbol}`),
         ...(!hasMemory ? [fetch(`/api/chart?symbol=${stock.symbol}`)] : []),
       ];
-
       const responses = await Promise.all(fetchPromises);
       const newsData = await responses[0].json();
       const marketContextData = await responses[1].json();
@@ -53,12 +85,10 @@ export default function StockCard({ stock }) {
           tradingMode,
         }),
       });
-
       const aiData = await aiRes.json();
       if (!aiRes.ok) return toast.error(aiData.error || "AI analysis failed");
       setSignal(aiData);
 
-      // Save memory
       if (aiData.memoryUpdate) {
         const newMemory = {
           ...memoryData,
@@ -88,7 +118,6 @@ export default function StockCard({ stock }) {
             },
           ].slice(-20),
         };
-
         await fetch("/api/memory", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -99,7 +128,6 @@ export default function StockCard({ stock }) {
           }),
         });
       }
-
       toast.success(
         hasMemory ? "⚡ Quick analysis done!" : "🧠 Deep analysis done!",
       );
@@ -111,224 +139,278 @@ export default function StockCard({ stock }) {
     }
   };
 
-  const signalStyles = {
-    BUY: "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30",
-    SELL: "bg-red-500/20 text-red-400 border border-red-500/30",
-    HOLD: "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30",
+  const signalConfig = {
+    BUY: {
+      border: "border-l-emerald-500",
+      text: "text-emerald-400",
+      bg: "bg-emerald-500/10",
+    },
+    SELL: {
+      border: "border-l-red-500",
+      text: "text-red-400",
+      bg: "bg-red-500/10",
+    },
+    HOLD: {
+      border: "border-l-amber-500",
+      text: "text-amber-400",
+      bg: "bg-amber-500/10",
+    },
   };
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 flex flex-col gap-4">
-      {/* Header */}
-      <Link
-        href={`/stock/${stock.symbol}`}
-        className="block hover:opacity-80 transition-opacity"
-      >
-        <div className="flex justify-between items-start">
-          <div>
-            <h3 className="text-lg font-bold text-white">
-              {stock.symbol?.replace(".NS", "").replace(".BO", "")}
-            </h3>
-            <p className="text-xs text-zinc-400 max-w-[140px] truncate">
-              {stock.name}
-            </p>
-            <span className="text-xs text-zinc-500">
-              {stock.exchange || "NSE"}
-            </span>
-          </div>
-          <div className="text-right">
-            <div className="text-xl font-bold text-white">
-              ₹{stock.price?.toFixed(2)}
-            </div>
-            <div
-              className={`text-sm font-medium ${stock.change >= 0 ? "text-emerald-400" : "text-red-400"}`}
-            >
-              {stock.change >= 0 ? "▲" : "▼"}{" "}
-              {Math.abs(stock.change).toFixed(2)}%
-            </div>
-          </div>
+    <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl overflow-hidden">
+      {/* Header row */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-5">
+        <Link
+          href={`/stock/${stock.symbol}`}
+          className="flex flex-col hover:opacity-80 transition-opacity sm:w-48 shrink-0"
+        >
+          <span className="text-base font-semibold text-white tracking-tight">
+            {stock.symbol?.replace(".NS", "").replace(".BO", "")}
+          </span>
+          <span className="text-xs text-zinc-500 truncate max-w-[180px]">
+            {stock.name}
+          </span>
+        </Link>
+
+        <div className="flex items-baseline gap-2 sm:w-32 shrink-0">
+          <span className="text-xl font-semibold text-white tabular-nums">
+            ₹{stock.price?.toFixed(2)}
+          </span>
+          <span
+            className={`text-xs font-medium tabular-nums ${stock.change >= 0 ? "text-emerald-400" : "text-red-400"}`}
+          >
+            {stock.change >= 0 ? "+" : ""}
+            {stock.change?.toFixed(2)}%
+          </span>
         </div>
-      </Link>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-2 text-sm">
-        {[
-          { label: "Open", value: `₹${stock.open?.toFixed(2)}` },
-          { label: "Prev Close", value: `₹${stock.prevClose?.toFixed(2)}` },
-          { label: "High", value: `₹${stock.high?.toFixed(2)}` },
-          { label: "Low", value: `₹${stock.low?.toFixed(2)}` },
-          {
-            label: "52W High",
-            value: `₹${stock.fiftyTwoWeekHigh?.toFixed(2)}`,
-          },
-          {
-            label: "52W Low",
-            value: `₹${stock.fiftyTwoWeekLow?.toFixed(2)}`,
-          },
-          { label: "Volume", value: stock.volume?.toLocaleString("en-IN") },
-          {
-            label: "Holding",
-            value: holding ? `${holding.quantity} qty` : "None",
-          },
-        ].map(({ label, value }) => (
-          <div key={label} className="bg-zinc-800 rounded-lg px-3 py-2">
-            <div className="text-zinc-500 text-xs">{label}</div>
-            <div className="text-white font-medium text-sm">{value}</div>
-          </div>
-        ))}
-      </div>
-
-      {signal?.memoryUpdate && (
-        <div className="bg-zinc-800/50 rounded-lg px-3 py-2 text-xs text-zinc-400 border border-zinc-700/50 flex justify-between items-center">
-          <span>🧠 {signal.memoryUpdate.character}</span>
-          {memory?.winRate && (
-            <span
-              className={`font-bold ${memory.winRate >= 50 ? "text-emerald-400" : "text-red-400"}`}
-            >
-              {memory.winRate}% WR
+        {/* Ticker strip — quiet, monospace-ish via tabular-nums */}
+        <div className="hidden lg:flex items-center gap-5 text-xs text-zinc-500 flex-1 tabular-nums">
+          <span>
+            O <span className="text-zinc-300">{stock.open?.toFixed(2)}</span>
+          </span>
+          <span>
+            H <span className="text-zinc-300">{stock.high?.toFixed(2)}</span>
+          </span>
+          <span>
+            L <span className="text-zinc-300">{stock.low?.toFixed(2)}</span>
+          </span>
+          <span>
+            Vol{" "}
+            <span className="text-zinc-300">
+              {stock.volume?.toLocaleString("en-IN")}
+            </span>
+          </span>
+          {holding && (
+            <span className="text-zinc-400">
+              · Holding{" "}
+              <span className="text-white font-medium">{holding.quantity}</span>
             </span>
           )}
         </div>
-      )}
 
-      {/* AI Signal */}
+        {/* Actions */}
+        <div className="flex items-center gap-2 sm:ml-auto">
+          <input
+            type="number"
+            min={1}
+            max={holding ? holding.quantity : undefined}
+            value={quantity}
+            onChange={(e) => {
+              const val = parseInt(e.target.value);
+              if (isNaN(val) || val < 1) return setQuantity(1);
+              if (holding && val > holding.quantity)
+                return setQuantity(holding.quantity);
+              setQuantity(val);
+            }}
+            className="w-14 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-white text-sm text-center tabular-nums focus:outline-none focus:border-zinc-500"
+          />
+          <button
+            onClick={() => buyStock(stock, quantity, stock.price)}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-3.5 py-1.5 rounded-lg transition-colors"
+          >
+            Buy
+          </button>
+          <button
+            onClick={async () => {
+              if (!holding) return toast.error("No holding to sell");
+              const result = await sellStock(
+                stock.symbol,
+                quantity,
+                stock.price,
+              );
+              if (result === "oversell")
+                return toast.error(`You only have ${holding.quantity} qty!`);
+              toast.success(
+                `Sold ${quantity} × ${stock.symbol?.replace(".NS", "")}`,
+              );
+            }}
+            disabled={!holding}
+            className="bg-red-600 hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium px-3.5 py-1.5 rounded-lg transition-colors"
+          >
+            Sell
+          </button>
+          <button
+            onClick={() => removeFromWatchlist(stock.symbol)}
+            className="text-zinc-500 hover:text-zinc-300 p-1.5 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* AI Signal — colored left border, calmer */}
       {signal && (
-        <div className="bg-zinc-800 rounded-lg p-3 flex flex-col gap-3">
-          <div className="flex justify-between items-center">
-            <span
-              className={`text-sm font-bold px-3 py-1 rounded-full ${signalStyles[signal.signal]}`}
-            >
-              {signal.signal}
-            </span>
-            <span className="text-xs text-zinc-400">
-              Confidence: {signal.confidence}/10
-            </span>
-          </div>
-          {signal && marketContext && (
-            <div className="flex gap-2 text-xs flex-wrap">
+        <div
+          className={`border-t border-zinc-800 border-l-[3px] ${signalConfig[signal.signal]?.border} px-5 py-4 flex flex-col gap-2.5`}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
               <span
-                className={`px-2 py-0.5 rounded-full ${
-                  marketContext.nifty?.change >= 0
-                    ? "bg-emerald-500/20 text-emerald-400"
-                    : "bg-red-500/20 text-red-400"
-                }`}
+                className={`text-xs font-semibold ${signalConfig[signal.signal]?.text}`}
               >
-                NIFTY {marketContext.nifty?.change >= 0 ? "▲" : "▼"}
-                {Math.abs(marketContext.nifty?.change || 0).toFixed(2)}%
+                {signal.signal}
               </span>
-              <span
-                className={`px-2 py-0.5 rounded-full ${
-                  marketContext.sector?.change >= 0
-                    ? "bg-emerald-500/20 text-emerald-400"
-                    : "bg-red-500/20 text-red-400"
-                }`}
-              >
-                {marketContext.sector?.name}{" "}
-                {marketContext.sector?.change >= 0 ? "▲" : "▼"}
-                {Math.abs(marketContext.sector?.change || 0).toFixed(2)}%
+              <span className="text-xs text-zinc-500">·</span>
+              <span className="text-xs text-zinc-400">
+                Confidence {signal.confidence}/10
               </span>
+              {signal.riskLevel && (
+                <>
+                  <span className="text-xs text-zinc-500">·</span>
+                  <span className="text-xs text-zinc-400">
+                    {signal.riskLevel} risk
+                  </span>
+                </>
+              )}
+              {memory?.winRate != null && (
+                <>
+                  <span className="text-xs text-zinc-500">·</span>
+                  <span
+                    className={`text-xs font-medium ${memory.winRate >= 50 ? "text-emerald-400" : "text-red-400"}`}
+                  >
+                    {memory.winRate}% win rate
+                  </span>
+                </>
+              )}
             </div>
-          )}
-          <p className="text-sm text-zinc-300">{signal.reason}</p>
-          <div className="flex gap-3 text-xs">
-            <span className="text-red-400">Stop Loss: ₹{signal.stopLoss}</span>
-            <span className="text-emerald-400">Target: ₹{signal.target}</span>
+
+            <div className="flex items-center gap-3">
+              {memory?.lastAnalysis?.date && (
+                <span className="text-[11px] text-zinc-600">
+                  {new Date(memory.lastAnalysis.date).toLocaleString("en-IN", {
+                    day: "2-digit",
+                    month: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              )}
+              <button
+                onClick={analyzeStock}
+                disabled={loading}
+                title="Refresh analysis"
+                className="text-zinc-500 hover:text-white transition-colors disabled:opacity-50"
+              >
+                <RefreshCw
+                  className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`}
+                />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2 pt-1 border-t border-zinc-700">
-            <span className="text-xs text-zinc-500">Risk:</span>
-            <span
-              className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                signal.riskLevel === "LOW"
-                  ? "bg-emerald-500/20 text-emerald-400"
-                  : signal.riskLevel === "HIGH"
-                    ? "bg-red-500/20 text-red-400"
-                    : "bg-yellow-500/20 text-yellow-400"
-              }`}
-            >
-              {signal.riskLevel}
+
+          <p className="text-[13px] text-zinc-400 leading-relaxed">
+            {signal.reason}
+          </p>
+
+          <div className="flex gap-5 text-xs tabular-nums">
+            <span className="text-zinc-500">
+              Stop Loss{" "}
+              <span className="text-red-400 font-medium">
+                ₹{signal.stopLoss}
+              </span>
+            </span>
+            <span className="text-zinc-500">
+              Target{" "}
+              <span className="text-emerald-400 font-medium">
+                ₹{signal.target}
+              </span>
             </span>
           </div>
 
-          {/* News */}
           {news.length > 0 && (
-            <div className="flex flex-col gap-1 pt-1 border-t border-zinc-700">
-              <div className="text-xs text-zinc-500 font-medium mb-1">
-                Recent News
-              </div>
-              {news.slice(0, 3).map((n, i) => (
-                <a
-                  key={i}
-                  href={n.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-zinc-300 hover:text-white bg-zinc-900 rounded-lg px-3 py-2 leading-relaxed hover:bg-zinc-700 transition-colors"
-                >
-                  {n.title}
-                  <span className="block text-zinc-500 mt-0.5">
-                    {n.source} ·{" "}
-                    {new Date(n.pubDate).toLocaleDateString("en-IN")}
-                  </span>
-                </a>
-              ))}
-            </div>
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="news" className="border-zinc-800">
+                <AccordionTrigger className="group px-1 py-2 hover:no-underline">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Newspaper className="h-4 w-4 text-blue-400" />
+                    <span className="font-medium text-zinc-300">
+                      Latest News
+                    </span>
+                    <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-500">
+                      {news.length}
+                    </span>
+                  </div>
+                </AccordionTrigger>
+
+                <AccordionContent>
+                  <ScrollArea className="h-(--radix-accordion-content-height)">
+                    <div className="space-y-2 pt-2">
+                      {news.map((n, i) => (
+                        <Link
+                          key={i}
+                          href={n.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="group block rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 transition-all duration-200 hover:border-zinc-700 hover:bg-zinc-800/50 hover:shadow-lg hover:shadow-black/20 no-underline!"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <h4 className="text-sm font-medium text-zinc-200 line-clamp-2 group-hover:text-white">
+                              {n.title}
+                            </h4>
+
+                            <ExternalLink className="h-3.5 w-3.5 shrink-0 text-zinc-600 transition-colors group-hover:text-zinc-400" />
+                          </div>
+
+                          <div className="mt-2 flex items-center gap-2 text-[11px]">
+                            <span className="rounded-md bg-zinc-800 px-2 py-1 text-zinc-400">
+                              {n.source}
+                            </span>
+
+                            <span className="text-zinc-600">
+                              {new Date(n.pubDate).toLocaleDateString("en-IN", {
+                                day: "numeric",
+                                month: "short",
+                              })}
+                            </span>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           )}
         </div>
       )}
 
-      {/* Quantity + Actions */}
-      <div className="flex gap-2 items-center">
-        <input
-          type="number"
-          min={1}
-          max={holding ? holding.quantity : undefined}
-          value={quantity}
-          onChange={(e) => {
-            const val = parseInt(e.target.value);
-            if (isNaN(val) || val < 1) return setQuantity(1);
-            if (holding && val > holding.quantity)
-              return setQuantity(holding.quantity);
-            setQuantity(val);
-          }}
-          className="w-16 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2 text-white text-sm text-center focus:outline-none focus:border-zinc-500"
-        />
-        <button
-          onClick={analyzeStock}
-          disabled={loading}
-          className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-medium py-2 rounded-lg transition-colors"
-        >
-          {loading ? "Analyzing..." : "🤖 AI Analyze"}
-        </button>
-      </div>
-
-      <div className="flex gap-2">
-        <button
-          onClick={() => buyStock(stock, quantity, stock.price)}
-          className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium py-2 rounded-lg transition-colors"
-        >
-          Buy
-        </button>
-        <button
-          onClick={async () => {
-            if (!holding) return toast.error("No holding to sell");
-            const result = await sellStock(stock.symbol, quantity, stock.price);
-            if (result === "oversell")
-              return toast.error(`You only have ${holding.quantity} qty!`);
-            toast.success(
-              `Sold ${quantity} × ${stock.symbol?.replace(".NS", "")}`,
-            );
-          }}
-          disabled={!holding}
-          className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium py-2 rounded-lg transition-colors"
-        >
-          Sell
-        </button>
-        <button
-          onClick={() => removeFromWatchlist(stock.symbol)}
-          className="bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-sm px-3 py-2 rounded-lg transition-colors"
-        >
-          ✕
-        </button>
-      </div>
+      {/* No signal yet — show analyze CTA, separate from buy/sell */}
+      {!signal && (
+        <div className="border-t border-zinc-800 px-5 py-3 flex items-center justify-between">
+          <span className="text-xs text-zinc-500">
+            No AI analysis yet for {tradingMode} mode
+          </span>
+          <button
+            onClick={analyzeStock}
+            disabled={loading}
+            className="text-xs font-medium text-blue-400 hover:text-blue-300 disabled:opacity-50 transition-colors"
+          >
+            {loading ? "Analyzing..." : "Run AI Analysis →"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
