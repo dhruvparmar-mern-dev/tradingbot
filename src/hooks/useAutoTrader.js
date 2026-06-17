@@ -38,6 +38,7 @@ export default function useAutoTrader() {
           maxPerTrade,
           buyStock,
           sellStock,
+          tradingMode,
         } = useTradingStore.getState();
 
         if (!watchlist.length) return;
@@ -104,7 +105,9 @@ export default function useAutoTrader() {
           if (!priceData) continue;
 
           try {
-            const memRes = await fetch(`/api/memory?symbol=${holding.symbol}`);
+            const memRes = await fetch(
+              `/api/memory?symbol=${holding.symbol}&mode=${tradingMode}`,
+            );
             const memory = await memRes.json();
             if (!memory?.lastAnalysis) continue;
 
@@ -154,7 +157,9 @@ export default function useAutoTrader() {
             if (alreadyHolding) continue;
 
             try {
-              const memRes = await fetch(`/api/memory?symbol=${stock.symbol}`);
+              const memRes = await fetch(
+                `/api/memory?symbol=${stock.symbol}&mode=${tradingMode}`,
+              );
               const memory = await memRes.json();
               if (!memory?.lastAnalysis) continue;
 

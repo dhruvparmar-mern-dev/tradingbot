@@ -203,14 +203,16 @@ export default function useKiteWebSocket() {
   }, []);
 
   const checkStopLossTarget = useCallback(async (ticks) => {
-    const { portfolio, sellStock } = useTradingStore.getState();
+    const { portfolio, sellStock, tradingMode } = useTradingStore.getState();
 
     for (const tick of ticks) {
       const holding = portfolio.find((p) => p.symbol === tick.symbol);
       if (!holding) continue;
 
       try {
-        const memRes = await fetch(`/api/memory?symbol=${tick.symbol}`);
+        const memRes = await fetch(
+          `/api/memory?symbol=${tick.symbol}&mode=${tradingMode}`,
+        );
         const memory = await memRes.json();
         if (!memory?.lastAnalysis) continue;
 
