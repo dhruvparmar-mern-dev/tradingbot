@@ -165,6 +165,7 @@ export default function useAutoTrader() {
 
               const { signal, confidence } = memory.lastAnalysis;
               if (signal !== "BUY" || confidence < minConfidence) continue;
+              if (memory.lastAnalysis.acted) continue;
 
               const priceData = validPrices.find(
                 (p) => p.symbol === stock.symbol,

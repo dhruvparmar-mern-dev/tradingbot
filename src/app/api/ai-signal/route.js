@@ -67,6 +67,14 @@ Known Behavior: ${memory.behavior}
 Key Levels: Support ₹${memory.keyLevels?.support} | Resistance ₹${memory.keyLevels?.resistance}
 Last Signal: ${memory.lastAnalysis?.signal} on ${new Date(memory.lastAnalysis?.date).toLocaleDateString("en-IN")} at ₹${memory.lastAnalysis?.price || "unknown"}
 Past Signals: ${memory.signalHistory?.length || 0} signals recorded
+Win Rate: ${memory.winRate ?? "N/A"}% (${memory.completedSignals || 0} completed out of ${memory.totalSignals || 0} total signals)
+Recent Outcomes: ${
+        memory.signalHistory
+          ?.filter((s) => s.outcome !== "PENDING")
+          .slice(-3)
+          .map((s) => `${s.signal}@₹${s.price}→${s.outcome}`)
+          .join(", ") || "No completed signals yet"
+      }
 
 TODAY'S UPDATE:
 Price: ₹${stockData.price} (${stockData.change?.toFixed(2)}% change)

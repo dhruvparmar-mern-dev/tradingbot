@@ -27,10 +27,18 @@ export async function POST(request) {
   history[actualIndex].exitDate = new Date();
 
   // Win rate calculation
-  const completed = history.filter((s) => s.outcome !== "PENDING");
+  // const completed = history.filter((s) => s.outcome !== "PENDING");
+  // const wins = completed.filter((s) => s.outcome === "WIN").length;
+  // const winRate =
+  //   completed.length > 0 ? ((wins / completed.length) * 100).toFixed(0) : 0;
+
+  const actionableSignals = history.filter(
+    (s) => s.signal === "BUY" || s.signal === "SELL",
+  );
+  const completed = actionableSignals.filter((s) => s.outcome !== "PENDING");
   const wins = completed.filter((s) => s.outcome === "WIN").length;
   const winRate =
-    completed.length > 0 ? ((wins / completed.length) * 100).toFixed(0) : 0;
+    completed.length > 0 ? ((wins / completed.length) * 100).toFixed(0) : null;
 
   await Stock.findOneAndUpdate(
     { symbol },
