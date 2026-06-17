@@ -5,9 +5,10 @@ export async function middleware(request) {
   const token = request.cookies.get("auth_token")?.value;
   const isLoginPage = request.nextUrl.pathname === "/login";
   const isAuthApi = request.nextUrl.pathname.startsWith("/api/auth");
+  const isKiteApi = request.nextUrl.pathname.startsWith("/api/kite");
 
   // Allow auth APIs always
-  if (isAuthApi) return NextResponse.next();
+  if (isAuthApi || isKiteApi) return NextResponse.next();
 
   // Not logged in → redirect to login
   if (!token) {
