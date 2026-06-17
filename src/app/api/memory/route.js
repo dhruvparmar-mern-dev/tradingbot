@@ -17,6 +17,12 @@ export async function POST(request) {
   await connectDB();
   const { symbol, memory, mode } = await request.json();
   const field = `memory${mode.charAt(0).toUpperCase() + mode.slice(1)}`;
-  await Stock.findOneAndUpdate({ symbol }, { $set: { [field]: memory } });
-  return NextResponse.json({ success: true });
+
+  const updated = await Stock.findOneAndUpdate(
+    { symbol },
+    { $set: { [field]: memory } },
+    { upsert: true, new: true },
+  );
+
+  return NextResponse.json({ success: true, saved: updated[field] });
 }
