@@ -6,12 +6,18 @@ import KiteSession from "@/models/KiteSession";
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const requestToken = searchParams.get("request_token");
+  const status = searchParams.get("status");
+
+  console.log("Kite callback received");
+  console.log("Status:", status);
+  console.log("Request token:", requestToken);
 
   try {
     const session = await kite.generateSession(
       requestToken,
       process.env.KITE_API_SECRET,
     );
+    console.log("Session generated:", session.access_token ? "yes" : "no");
 
     await connectDB();
     await KiteSession.findOneAndUpdate(
@@ -24,7 +30,8 @@ export async function GET(request) {
       },
       { upsert: true, new: true },
     );
-
+    console.log("Saved token:", saved.accessToken);
+    console.log("Saved at:", saved.createdAt);
     // Redirect to dashboard with success
     return NextResponse.redirect(new URL("/?kite=connected", request.url));
   } catch (err) {

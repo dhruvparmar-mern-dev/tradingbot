@@ -19,7 +19,9 @@ export default function StockCard({ stock }) {
   const analyzeStock = async () => {
     setLoading(true);
     try {
-      const memoryRes = await fetch(`/api/memory?symbol=${stock.symbol}`);
+      const memoryRes = await fetch(
+        `/api/memory?symbol=${stock.symbol}&mode=${tradingMode}`,
+      );
       const memoryData = await memoryRes.json();
       setMemory(memoryData);
       const hasMemory = memoryData && memoryData.lastAnalysis;
@@ -90,7 +92,11 @@ export default function StockCard({ stock }) {
         await fetch("/api/memory", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ symbol: stock.symbol, memory: newMemory }),
+          body: JSON.stringify({
+            symbol: stock.symbol,
+            memory: newMemory,
+            mode: tradingMode,
+          }),
         });
       }
 

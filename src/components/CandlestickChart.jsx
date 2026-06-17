@@ -73,8 +73,13 @@ export default function CandlestickChart({
           time = Math.floor(new Date(c.date).getTime() / 1000);
         } else {
           const [day, month, year] = c.date.split("/");
+          // time = Math.floor(
+          //   new Date(`${year}-${month}-${day}`).getTime() / 1000,
+          // );
           time = Math.floor(
-            new Date(`${year}-${month}-${day}`).getTime() / 1000,
+            new Date(
+              `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`,
+            ).getTime() / 1000,
           );
         }
         return {

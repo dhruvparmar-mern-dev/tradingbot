@@ -30,6 +30,11 @@ export default function useKiteWebSocket() {
 
   const connect = useCallback(async () => {
     try {
+      const kiteRes = await fetch("/api/kite/status");
+      const { connected: kiteConnected } = await kiteRes.json();
+
+      if (!kiteConnected) return;
+
       // Get access token
       const res = await fetch("/api/kite/websocket");
       if (!res.ok) return; // Not connected to Kite

@@ -36,6 +36,11 @@ export default function Dashboard() {
   );
   const totalPnL = totalValue - totalInvested;
 
+  // Also show realized P&L from closed trades:
+  const realizedPnL = tradeLog
+    .filter((t) => t.type === "SELL" && t.pnl)
+    .reduce((sum, t) => sum + t.pnl, 0);
+
   const refreshPrices = async (stocks, type = "watchlist") => {
     if (!stocks || stocks.length === 0) return [];
 
@@ -98,6 +103,11 @@ export default function Dashboard() {
     }
   };
 
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
+  };
+
   useAutoTrader();
   useKiteWebSocket();
 
@@ -132,11 +142,19 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
-        <div className="text-right">
-          <div className="text-xs text-zinc-500">Balance</div>
-          <div className="text-lg font-bold">
-            ₹{balance.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+        <div className="flex items-center gap-2">
+          <div className="text-right">
+            <div className="text-xs text-zinc-500">Balance</div>
+            <div className="text-lg font-bold">
+              ₹{balance.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+            </div>
           </div>
+          <button
+            onClick={handleLogout}
+            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+          >
+            Logout
+          </button>
         </div>
       </div>
 
@@ -157,9 +175,15 @@ export default function Dashboard() {
               color: "text-white",
             },
             {
-              label: "Total P&L",
+              //   label: "Total P&L",
+              label: "Unrealized P&L",
               value: `${totalPnL >= 0 ? "+" : ""}₹${totalPnL.toFixed(2)}`,
               color: totalPnL >= 0 ? "text-emerald-400" : "text-red-400",
+            },
+            {
+              label: "Realized P&L",
+              value: `${realizedPnL >= 0 ? "+" : ""}₹${realizedPnL.toFixed(2)}`,
+              color: realizedPnL >= 0 ? "text-emerald-400" : "text-red-400",
             },
             { label: "Holdings", value: portfolio.length, color: "text-white" },
           ].map(({ label, value, color }) => (

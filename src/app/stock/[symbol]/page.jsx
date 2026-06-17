@@ -63,6 +63,7 @@ export default function StockDetail() {
     try {
       const kiteRes = await fetch("/api/kite/status");
       const { connected: kiteConnected } = await kiteRes.json();
+      console.log("kiteConnected:", kiteConnected, "mode:", tradingMode);
 
       const chartEndpoint = kiteConnected
         ? `/api/kite/historical?symbol=${symbol}&mode=${tradingMode}`

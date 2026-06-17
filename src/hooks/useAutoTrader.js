@@ -8,6 +8,25 @@ export default function useAutoTrader() {
 
   useEffect(() => {
     const checkAndTrade = async () => {
+      // Market hours check — IST is UTC+5:30
+      const now = new Date();
+      const istOffset = 5.5 * 60 * 60 * 1000;
+      const ist = new Date(now.getTime() + istOffset);
+      const hours = ist.getUTCHours();
+      const minutes = ist.getUTCMinutes();
+      const timeInMinutes = hours * 60 + minutes;
+
+      const marketOpen = 9 * 60 + 15; // 9:15 AM
+      const marketClose = 15 * 60 + 15; // 3:15 PM
+      const isMarketOpen =
+        timeInMinutes >= marketOpen && timeInMinutes <= marketClose;
+
+      // Skip auto buy/sell outside market hours
+      if (!isMarketOpen) {
+        console.log("Market closed, skipping auto trade");
+        return;
+      }
+
       if (isRunningRef.current) return;
       isRunningRef.current = true;
 
@@ -158,6 +177,25 @@ export default function useAutoTrader() {
                 quantity,
                 priceData.price,
               );
+
+              // Mark signal as acted so it doesn't buy again
+              await fetch("/api/memory", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  symbol: stock.symbol,
+                  memory: {
+                    ...memory,
+                    lastAnalysis: {
+                      ...memory.lastAnalysis,
+                      acted: true,
+                      actedAt: new Date(),
+                    },
+                  },
+                  mode: useTradingStore.getState().tradingMode,
+                }),
+              });
+
               toast.success(
                 `🤖 Auto bought ${quantity} × ${stock.symbol?.replace(".NS", "")} at ₹${priceData.price}`,
               );
