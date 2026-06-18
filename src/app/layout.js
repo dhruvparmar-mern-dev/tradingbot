@@ -4,6 +4,7 @@ import { Toaster } from "sonner";
 import Navbar from "@/components/Navbar";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import AppShell from "@/components/AppShell";
+import KiteWarningBanner from "@/components/KiteWarningBanner";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -27,6 +28,7 @@ export default function RootLayout({ children }) {
         >
           <Toaster position="top-right" richColors />
           <Navbar />
+          <KiteWarningBanner />
           <AppShell>{children}</AppShell>
         </ThemeProvider>
       </body>

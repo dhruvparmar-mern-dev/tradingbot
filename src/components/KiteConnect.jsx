@@ -8,6 +8,8 @@ export default function KiteConnect() {
   const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
 
+  console.log(connected);
+
   useEffect(() => {
     checkStatus();
 

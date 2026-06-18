@@ -23,21 +23,18 @@ export async function GET() {
   await connectDB();
   const session = await KiteSession.findOne({ userId: "default" });
 
-  if (!session) return NextResponse.json({ connected: false });
+  if (!session?.accessToken) {
+    return NextResponse.json({ connected: false });
+  }
 
-  // Compare dates in IST
-  const tokenDate = new Date(session.createdAt);
-  const now = new Date();
+  kite.setAccessToken(session.accessToken);
 
-  // Check if token was created today (within last 24 hours is fine)
-  const hoursDiff = (now - tokenDate) / (1000 * 60 * 60);
-  console.log("Hours since token created:", hoursDiff);
-
-  const isValid = hoursDiff < 24;
-
-  return NextResponse.json({
-    connected: isValid,
-    createdAt: session.createdAt,
-    hoursDiff,
-  });
+  try {
+    // Lightweight real check — will throw if token invalid/expired
+    await kite.getProfile();
+    return NextResponse.json({ connected: true, createdAt: session.createdAt });
+  } catch (err) {
+    console.error("Kite token invalid:", err.message);
+    return NextResponse.json({ connected: false, reason: err.message });
+  }
 }

@@ -3,10 +3,6 @@ import kite from "@/lib/kite";
 import { connectDB } from "@/lib/mongoose";
 import KiteSession from "@/models/KiteSession";
 
-// Cache instruments globally (resets on server restart)
-let cachedInstruments = null;
-let cacheTime = null;
-
 export async function GET(request) {
   await connectDB();
   const { searchParams } = new URL(request.url);
@@ -24,18 +20,10 @@ export async function GET(request) {
   try {
     // Get instrument token
     const cleanSymbol = symbol.replace(".NS", "").replace(".BO", "");
-    // const instruments = await kite.getInstruments("NSE");
-    // const instrument = instruments.find((i) => i.tradingsymbol === cleanSymbol);
-
-    // Inside GET handler, replace getInstruments call:
-    if (!cachedInstruments || !cacheTime || Date.now() - cacheTime > 3600000) {
-      cachedInstruments = await kite.getInstruments("NSE");
-      cacheTime = Date.now();
-    }
-
-    const instrument = cachedInstruments.find(
-      (i) => i.tradingsymbol === cleanSymbol,
-    );
+    const instruments = await getNSEInstruments();
+    const instrument = instruments.find((i) => i.tradingsymbol === cleanSymbol);
+    if (!instrument)
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     if (!instrument)
       return NextResponse.json({ error: "Not found" }, { status: 404 });
