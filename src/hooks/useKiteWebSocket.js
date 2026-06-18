@@ -227,6 +227,7 @@ export default function useKiteWebSocket() {
               symbol: holding.symbol,
               outcome: "WIN",
               price: tick.price,
+              mode: tradingMode,
             }),
           });
           toast.success(
@@ -241,6 +242,7 @@ export default function useKiteWebSocket() {
               symbol: holding.symbol,
               outcome: "LOSS",
               price: tick.price,
+              mode: tradingMode,
             }),
           });
           toast.error(

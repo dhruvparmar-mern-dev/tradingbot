@@ -4,15 +4,17 @@ import Stock from "@/models/Stock";
 
 export async function POST(request) {
   await connectDB();
-  const { symbol, outcome, price } = await request.json();
+  const { symbol, outcome, price, mode } = await request.json();
+  const field = `memory${mode.charAt(0).toUpperCase() + mode.slice(1)}`;
 
   const stock = await Stock.findOne({ symbol });
-  if (!stock?.memory?.signalHistory?.length) {
+  const memory = stock?.[field];
+
+  if (!memory?.signalHistory?.length) {
     return NextResponse.json({ error: "No signal history" }, { status: 404 });
   }
 
-  // Update latest PENDING signal with outcome
-  const history = stock.memory.signalHistory;
+  const history = memory.signalHistory;
   const lastPendingIndex = [...history]
     .reverse()
     .findIndex((s) => s.outcome === "PENDING");
@@ -26,12 +28,6 @@ export async function POST(request) {
   history[actualIndex].exitPrice = price;
   history[actualIndex].exitDate = new Date();
 
-  // Win rate calculation
-  // const completed = history.filter((s) => s.outcome !== "PENDING");
-  // const wins = completed.filter((s) => s.outcome === "WIN").length;
-  // const winRate =
-  //   completed.length > 0 ? ((wins / completed.length) * 100).toFixed(0) : 0;
-
   const actionableSignals = history.filter(
     (s) => s.signal === "BUY" || s.signal === "SELL",
   );
@@ -44,10 +40,10 @@ export async function POST(request) {
     { symbol },
     {
       $set: {
-        "memory.signalHistory": history,
-        "memory.winRate": winRate,
-        "memory.totalSignals": history.length,
-        "memory.completedSignals": completed.length,
+        [`${field}.signalHistory`]: history,
+        [`${field}.winRate`]: winRate,
+        [`${field}.totalSignals`]: actionableSignals.length,
+        [`${field}.completedSignals`]: completed.length,
       },
     },
   );

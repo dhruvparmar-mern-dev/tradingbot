@@ -123,6 +123,7 @@ export default function useAutoTrader() {
                   symbol: holding.symbol,
                   outcome: "WIN",
                   price: currentPrice,
+                  mode: tradingMode,
                 }),
               });
               toast.success(
@@ -137,6 +138,7 @@ export default function useAutoTrader() {
                   symbol: holding.symbol,
                   outcome: "LOSS",
                   price: currentPrice,
+                  mode: tradingMode,
                 }),
               });
               toast.error(
