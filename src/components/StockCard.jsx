@@ -11,16 +11,16 @@ import {
 } from "@/components/ui/accordion";
 import { ExternalLink, Newspaper, RefreshCw, X } from "lucide-react";
 import { ScrollArea } from "./ui/scroll-area";
+import { runAnalysis } from "@/lib/runAnalysis";
 
 export default function StockCard({ stock }) {
   const [loading, setLoading] = useState(false);
   const [news, setNews] = useState([]);
   const [signal, setSignal] = useState(null);
   const [memory, setMemory] = useState(null);
-  const [quantity, setQuantity] = useState(1);
-  const [marketContext, setMarketContext] = useState(null);
   const { buyStock, sellStock, portfolio, removeFromWatchlist, tradingMode } =
     useTradingStore();
+  const [quantity, setQuantity] = useState(1);
 
   const holding = portfolio.find((p) => p.symbol === stock.symbol);
 
@@ -53,87 +53,17 @@ export default function StockCard({ stock }) {
   const analyzeStock = async () => {
     setLoading(true);
     try {
-      const memoryRes = await fetch(
+      const result = await runAnalysis(stock, tradingMode);
+      setSignal(result);
+      setNews(result.news || []);
+      const memRes = await fetch(
         `/api/memory?symbol=${stock.symbol}&mode=${tradingMode}`,
       );
-      const memoryData = await memoryRes.json();
-      setMemory(memoryData);
-      const hasMemory = memoryData && memoryData.lastAnalysis;
-
-      const fetchPromises = [
-        fetch(`/api/news?symbol=${stock.symbol}`),
-        fetch(`/api/market-context?symbol=${stock.symbol}`),
-        ...(!hasMemory ? [fetch(`/api/chart?symbol=${stock.symbol}`)] : []),
-      ];
-      const responses = await Promise.all(fetchPromises);
-      const newsData = await responses[0].json();
-      const marketContextData = await responses[1].json();
-      const chartData = !hasMemory ? await responses[2].json() : null;
-
-      setNews(newsData);
-      setMarketContext(marketContextData);
-
-      const aiRes = await fetch("/api/ai-signal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          stockData: stock,
-          news: newsData,
-          chartData,
-          memory: hasMemory ? memoryData : null,
-          marketContext: marketContextData,
-          tradingMode,
-        }),
-      });
-      const aiData = await aiRes.json();
-      if (!aiRes.ok) return toast.error(aiData.error || "AI analysis failed");
-      setSignal(aiData);
-
-      if (aiData.memoryUpdate) {
-        const newMemory = {
-          ...memoryData,
-          character: aiData.memoryUpdate.character,
-          behavior: aiData.memoryUpdate.behavior,
-          keyLevels: aiData.memoryUpdate.keyLevels,
-          lastAnalysis: {
-            signal: aiData.signal,
-            confidence: aiData.confidence,
-            rsi: chartData?.indicators?.rsi || memoryData?.lastAnalysis?.rsi,
-            trend:
-              chartData?.indicators?.trend || memoryData?.lastAnalysis?.trend,
-            reason: aiData.reason,
-            stopLoss: aiData.stopLoss,
-            target: aiData.target,
-            price: stock.price,
-            date: new Date(),
-          },
-          signalHistory: [
-            ...(memoryData?.signalHistory || []),
-            {
-              signal: aiData.signal,
-              confidence: aiData.confidence,
-              price: stock.price,
-              date: new Date(),
-              outcome: "PENDING",
-            },
-          ].slice(-20),
-        };
-        await fetch("/api/memory", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            symbol: stock.symbol,
-            memory: newMemory,
-            mode: tradingMode,
-          }),
-        });
-      }
-      toast.success(
-        hasMemory ? "⚡ Quick analysis done!" : "🧠 Deep analysis done!",
-      );
+      setMemory(await memRes.json());
+      toast.success("Analysis done!");
     } catch (err) {
       console.error(err);
-      toast.error("Something went wrong");
+      toast.error(err.message || "Something went wrong");
     } finally {
       setLoading(false);
     }

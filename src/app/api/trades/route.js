@@ -4,7 +4,7 @@ import Trade from "@/models/Trade";
 
 export async function GET() {
   await connectDB();
-  const trades = await Trade.find().sort({ time: -1 });
+  const trades = await Trade.find().sort({ time: -1 }); // newest first
   return NextResponse.json(trades);
 }
 

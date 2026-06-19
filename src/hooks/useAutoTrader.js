@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import useTradingStore from "@/store/tradingStore";
 import { toast } from "sonner";
+import { runAnalysis as reanalyzeStock } from "@/lib/runAnalysis";
 
 export default function useAutoTrader() {
   const intervalRef = useRef(null);
@@ -104,9 +105,11 @@ export default function useAutoTrader() {
           );
           if (!priceData) continue;
 
+          const holdingMode = holding.mode || tradingMode; // use the mode this position was bought under
+
           try {
             const memRes = await fetch(
-              `/api/memory?symbol=${holding.symbol}&mode=${tradingMode}`,
+              `/api/memory?symbol=${holding.symbol}&mode=${holdingMode}`,
             );
             const memory = await memRes.json();
             if (!memory?.lastAnalysis) continue;
@@ -123,7 +126,7 @@ export default function useAutoTrader() {
                   symbol: holding.symbol,
                   outcome: "WIN",
                   price: currentPrice,
-                  mode: tradingMode,
+                  mode: holdingMode,
                 }),
               });
               toast.success(
@@ -138,7 +141,7 @@ export default function useAutoTrader() {
                   symbol: holding.symbol,
                   outcome: "LOSS",
                   price: currentPrice,
-                  mode: tradingMode,
+                  mode: holdingMode,
                 }),
               });
               toast.error(
@@ -169,10 +172,47 @@ export default function useAutoTrader() {
               if (signal !== "BUY" || confidence < minConfidence) continue;
               if (memory.lastAnalysis.acted) continue;
 
-              const priceData = validPrices.find(
-                (p) => p.symbol === stock.symbol,
-              );
-              if (!priceData) continue;
+              const signalAge =
+                (Date.now() - new Date(memory.lastAnalysis.date).getTime()) /
+                (1000 * 60);
+              const maxAgeMinutes = tradingMode === "intraday" ? 15 : 240;
+              const priceMoveSinceSignal = priceData
+                ? Math.abs(
+                    (priceData.price - memory.lastAnalysis.price) /
+                      memory.lastAnalysis.price,
+                  ) * 100
+                : 0;
+
+              const needsReanalysis =
+                signalAge > maxAgeMinutes || priceMoveSinceSignal > 1.5;
+
+              if (needsReanalysis) {
+                const msg = `Re-analyzing ${stock.symbol} — stale (${signalAge.toFixed(0)}min) or moved (${priceMoveSinceSignal.toFixed(2)}%)`;
+                console.log(msg);
+                toast.info(msg);
+
+                try {
+                  const freshSignal = await reanalyzeStock(stock, tradingMode);
+                  if (
+                    !freshSignal ||
+                    freshSignal.signal !== "BUY" ||
+                    freshSignal.confidence < minConfidence
+                  ) {
+                    continue; // AI changed its mind or confidence dropped, skip this cycle
+                  }
+                  // Use the fresh signal's data going forward for this buy decision
+                  memory.lastAnalysis = freshSignal.lastAnalysis; // updated reference
+                } catch (err) {
+                  console.error("Re-analysis failed:", err);
+                  toast.error("Re-analysis failed");
+                  continue; // fail safe — don't buy on uncertain data
+                }
+              }
+
+              // const priceData = validPrices.find(
+              //   (p) => p.symbol === stock.symbol,
+              // );
+              // if (!priceData) continue;
 
               const quantity = Math.floor(maxPerTrade / priceData.price);
               if (quantity < 1) continue;

@@ -7,6 +7,7 @@ const TradeSchema = new mongoose.Schema({
   price: Number,
   total: Number,
   pnl: Number,
+  mode: { type: String, default: "swing" },
   time: { type: Date, default: Date.now },
 });
 

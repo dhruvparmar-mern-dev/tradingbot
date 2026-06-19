@@ -82,6 +82,7 @@ const useTradingStore = create((set, get) => ({
   },
 
   buyStock: async (stock, quantity, price) => {
+    const { tradingMode } = get();
     const res = await fetch("/api/trade", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -91,54 +92,52 @@ const useTradingStore = create((set, get) => ({
         name: stock.name,
         quantity,
         price,
+        mode: tradingMode,
       }),
     });
     const data = await res.json();
-    if (!res.ok) return data.error; // 'insufficient' etc
+    if (!res.ok) return data.error;
 
     const { portfolio, tradeLog } = get();
     const existing = portfolio.find((p) => p.symbol === stock.symbol);
-    const cost = quantity * price;
     const newPortfolio = existing
       ? portfolio.map((p) =>
-          p.symbol === stock.symbol
-            ? {
-                ...p,
-                quantity: p.quantity + quantity,
-                avgPrice:
-                  (p.avgPrice * p.quantity + cost) / (p.quantity + quantity),
-              }
-            : p,
+          p.symbol === stock.symbol ? { ...p, ...data.updatedHolding } : p,
         )
-      : [...portfolio, { ...stock, quantity, avgPrice: price }];
+      : [...portfolio, { ...stock, ...data.updatedHolding }];
 
     set({
-      balance: data.balance, // ← directly from backend, no manual calc
+      balance: data.balance,
       portfolio: newPortfolio,
       tradeLog: [{ ...data.trade, time: data.trade.time }, ...tradeLog],
     });
   },
 
   sellStock: async (symbol, quantity, price) => {
+    const { portfolio, tradeLog } = get();
+    const holding = portfolio.find((p) => p.symbol === symbol);
+    if (!holding) return "no_holding";
+    const mode = holding?.mode || get().tradingMode;
+
     const res = await fetch("/api/trade", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "SELL", symbol, quantity, price }),
+      body: JSON.stringify({ type: "SELL", symbol, quantity, price, mode }),
     });
     const data = await res.json();
-    if (!res.ok) return data.error; // 'oversell', 'no_holding'
+    if (!res.ok) return data.error;
 
-    const { portfolio, tradeLog } = get();
-    const holding = portfolio.find((p) => p.symbol === symbol);
-    const newPortfolio =
-      holding.quantity === quantity
-        ? portfolio.filter((p) => p.symbol !== symbol)
-        : portfolio.map((p) =>
-            p.symbol === symbol ? { ...p, quantity: p.quantity - quantity } : p,
-          );
+    // Sync portfolio from backend response, not local math
+    const newPortfolio = data.fullySold
+      ? portfolio.filter((p) => p.symbol !== symbol)
+      : portfolio.map((p) =>
+          p.symbol === symbol
+            ? { ...p, quantity: data.updatedHolding.quantity }
+            : p,
+        );
 
     set({
-      balance: data.balance, // ← directly from backend
+      balance: data.balance,
       portfolio: newPortfolio,
       tradeLog: [{ ...data.trade, time: data.trade.time }, ...tradeLog],
     });

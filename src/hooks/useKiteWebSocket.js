@@ -77,7 +77,7 @@ export default function useKiteWebSocket() {
 
       ws.onopen = () => {
         isConnectedRef.current = true;
-        console.log("Kite WebSocket connected");
+        console.log("✅ Kite WS connected at", new Date().toLocaleTimeString());
 
         // Subscribe to tokens in full mode (OHLC + last price)
         const subscribeMsg = {
@@ -106,8 +106,16 @@ export default function useKiteWebSocket() {
         }
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         isConnectedRef.current = false;
+        console.log(
+          "❌ Kite WS disconnected at",
+          new Date().toLocaleTimeString(),
+          "code:",
+          event.code,
+          "reason:",
+          event.reason,
+        );
         console.log("Kite WebSocket disconnected, reconnecting in 5s...");
 
         fetch("/api/kite/status")
@@ -183,6 +191,11 @@ export default function useKiteWebSocket() {
 
       if (ticks.length > 0) {
         // Update store with live prices
+        console.log(
+          "WS ticks received:",
+          ticks.map((t) => `${t.symbol}: ₹${t.price}`).join(", "),
+        );
+
         useTradingStore.setState((state) => ({
           watchlist: state.watchlist.map((s) => {
             const tick = ticks.find((t) => t.symbol === s.symbol);

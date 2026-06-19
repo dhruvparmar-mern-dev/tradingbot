@@ -5,6 +5,7 @@ const PortfolioSchema = new mongoose.Schema({
   name: String,
   quantity: Number,
   avgPrice: Number,
+  mode: { type: String, default: "swing" },
   updatedAt: { type: Date, default: Date.now },
 });
 
