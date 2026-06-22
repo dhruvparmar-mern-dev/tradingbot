@@ -160,6 +160,8 @@ export default function useKiteWebSocket() {
       if (buffer.byteLength < 2) return;
 
       const numPackets = view.getInt16(0);
+      console.log("numPackets:", numPackets);
+
       let offset = 2;
 
       const ticks = [];
