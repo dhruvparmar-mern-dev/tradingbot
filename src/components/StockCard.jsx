@@ -53,7 +53,9 @@ export default function StockCard({ stock }) {
   const analyzeStock = async () => {
     setLoading(true);
     try {
-      const result = await runAnalysis(stock, tradingMode);
+      const needsFreshChart = tradingMode === "intraday";
+
+      const result = await runAnalysis(stock, tradingMode, needsFreshChart);
       setSignal(result);
       setNews(result.news || []);
       const memRes = await fetch(

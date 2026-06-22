@@ -105,6 +105,12 @@ export default function useAutoTrader() {
           );
           if (!priceData) continue;
 
+          // Re-check holding still exists RIGHT NOW (not stale snapshot)
+          const stillHolding = useTradingStore
+            .getState()
+            .portfolio.find((p) => p.symbol === holding.symbol);
+          if (!stillHolding) continue; // already sold earlier in this same loop, skip
+
           const holdingMode = holding.mode || tradingMode; // use the mode this position was bought under
 
           try {
@@ -192,7 +198,11 @@ export default function useAutoTrader() {
                 toast.info(msg);
 
                 try {
-                  const freshSignal = await reanalyzeStock(stock, tradingMode);
+                  const freshSignal = await reanalyzeStock(
+                    stock,
+                    tradingMode,
+                    true,
+                  );
                   if (
                     !freshSignal ||
                     freshSignal.signal !== "BUY" ||

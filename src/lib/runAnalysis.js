@@ -1,19 +1,20 @@
-export async function runAnalysis(stock, tradingMode) {
+export async function runAnalysis(stock, tradingMode, forceFreshChart = false) {
   const memoryRes = await fetch(
     `/api/memory?symbol=${stock.symbol}&mode=${tradingMode}`,
   );
   const memoryData = await memoryRes.json();
   const hasMemory = memoryData && memoryData.lastAnalysis;
+  const needsChart = !hasMemory || forceFreshChart; // ← key change
 
   const fetchPromises = [
     fetch(`/api/news?symbol=${stock.symbol}`),
     fetch(`/api/market-context?symbol=${stock.symbol}`),
-    ...(!hasMemory ? [fetch(`/api/chart?symbol=${stock.symbol}`)] : []),
+    ...(needsChart ? [fetch(`/api/chart?symbol=${stock.symbol}`)] : []),
   ];
   const responses = await Promise.all(fetchPromises);
   const newsData = await responses[0].json();
   const marketContextData = await responses[1].json();
-  const chartData = !hasMemory ? await responses[2].json() : null;
+  const chartData = needsChart ? await responses[2].json() : null;
 
   const aiRes = await fetch("/api/ai-signal", {
     method: "POST",
