@@ -168,6 +168,11 @@ export default function useAutoTrader() {
             if (alreadyHolding) continue;
 
             try {
+              const priceData = validPrices.find(
+                (p) => p.symbol === stock.symbol,
+              ); // ← move here, uncommented
+              if (!priceData) continue;
+
               const memRes = await fetch(
                 `/api/memory?symbol=${stock.symbol}&mode=${tradingMode}`,
               );
