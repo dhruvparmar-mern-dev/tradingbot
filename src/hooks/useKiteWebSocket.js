@@ -44,6 +44,12 @@ export default function useKiteWebSocket() {
       if (!accessToken) return;
 
       const { watchlist } = useTradingStore.getState();
+      let attempts = 0;
+      while (watchlist.length === 0 && attempts < 10) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        watchlist = useTradingStore.getState().watchlist;
+        attempts++;
+      }
       if (!watchlist.length) return;
 
       //   // Get tokens for watchlist stocks
