@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import kite from "@/lib/kite";
 import { connectDB } from "@/lib/mongoose";
 import KiteSession from "@/models/KiteSession";
+import { getNSEInstruments } from "@/lib/kiteInstruments";
 
 export async function GET(request) {
   await connectDB();
