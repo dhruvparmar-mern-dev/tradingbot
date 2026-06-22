@@ -66,11 +66,14 @@ export default function useKiteWebSocket() {
           try {
             const r = await fetch(`/api/kite/instruments?symbol=${s.symbol}`);
             const data = await r.json();
+            console.log(`Token lookup for ${s.symbol}:`, data); // ← add this
             if (data.token) tokenMap[s.symbol] = data.token;
-          } catch {}
+          } catch (err) {
+            console.error(`Token fetch failed for ${s.symbol}:`, err); // ← add this
+          }
         }),
       );
-
+      console.log("Final tokenMap:", tokenMap); // ← add this
       const tokens = Object.values(tokenMap);
       if (!tokens.length) return;
       tokenMapRef.current = tokenMap;
@@ -101,6 +104,12 @@ export default function useKiteWebSocket() {
       };
 
       ws.onmessage = (event) => {
+        console.log(
+          "WS message received, type:",
+          typeof event.data,
+          event.data instanceof Blob,
+        ); // ← add this
+
         // Kite sends binary data
         if (event.data instanceof Blob) {
           const reader = new FileReader();
