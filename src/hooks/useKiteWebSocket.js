@@ -114,8 +114,16 @@ export default function useKiteWebSocket() {
         if (event.data instanceof Blob) {
           const reader = new FileReader();
           reader.onload = () => {
+            console.log(
+              "FileReader onload fired, buffer:",
+              reader.result?.byteLength,
+            );
+
             const buffer = reader.result;
             parseTick(buffer);
+          };
+          reader.onerror = (err) => {
+            console.error("FileReader error:", err);
           };
           reader.readAsArrayBuffer(event.data);
         }
@@ -156,6 +164,7 @@ export default function useKiteWebSocket() {
 
   const parseTick = useCallback((buffer) => {
     try {
+      console.log("Buffer size:", buffer.byteLength);
       const view = new DataView(buffer);
       if (buffer.byteLength < 2) return;
 
