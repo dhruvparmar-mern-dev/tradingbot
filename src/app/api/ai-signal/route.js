@@ -89,6 +89,13 @@ ${marketText}
 
 ${modeText}
 
+RULES FOR DECISION MAKING:
+- Your PRIMARY signal must come from technical analysis: RSI, MACD, trend, support/resistance, volume confirmation.
+- News and market context are SECONDARY — use them only to:
+  (a) avoid trades during clearly negative fundamental events (scam, regulatory action, major selloff), or
+  (b) add minor confidence when technicals and news align.
+- Do NOT generate a BUY/SELL signal primarily because of news sentiment alone. If technicals are neutral/weak, say HOLD even if news sounds positive.
+
 Based on your memory + today's update, give a quick decision.
 Respond in this exact JSON format only, no extra text:
 {
@@ -126,6 +133,13 @@ ${newsText}
 ${marketText}
 
 ${modeText}
+
+RULES FOR DECISION MAKING:
+- Your PRIMARY signal must come from technical analysis: RSI, MACD, trend, support/resistance, volume confirmation.
+- News and market context are SECONDARY — use them only to:
+  (a) avoid trades during clearly negative fundamental events (scam, regulatory action, major selloff), or
+  (b) add minor confidence when technicals and news align.
+- Do NOT generate a BUY/SELL signal primarily because of news sentiment alone. If technicals are neutral/weak, say HOLD even if news sounds positive.
 
 Respond in this exact JSON format only, no extra text:
 {

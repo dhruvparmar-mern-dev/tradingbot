@@ -122,8 +122,8 @@ export default function useAutoTrader() {
 
             const { stopLoss, target } = memory.lastAnalysis;
             const currentPrice = priceData.price;
-
-            if (target && currentPrice >= target) {
+            const targetBuffer = target * 0.998; // 0.2% buffer
+            if (target && currentPrice >= targetBuffer) {
               await sellStock(holding.symbol, holding.quantity, currentPrice);
               await fetch("/api/outcome", {
                 method: "POST",

@@ -30,17 +30,24 @@ export default function useKiteWebSocket() {
 
   const connect = useCallback(async () => {
     try {
+      console.log("🔹 [1] connect() called");
+
       const kiteRes = await fetch("/api/kite/status");
       const { connected: kiteConnected } = await kiteRes.json();
-
+      console.log("🔹 [2] Kite status:", kiteConnected);
       if (!kiteConnected) return;
 
-      // Get access token
       const res = await fetch("/api/kite/websocket");
-      if (!res.ok) return; // Not connected to Kite
+      console.log("🔹 [3] /api/kite/websocket response ok:", res.ok);
+      if (!res.ok) return;
 
       const { accessToken, apiKey } = await res.json();
-
+      console.log(
+        "🔹 [4] accessToken exists:",
+        !!accessToken,
+        "apiKey exists:",
+        !!apiKey,
+      );
       if (!accessToken) return;
 
       let watchlist = useTradingStore.getState().watchlist;
@@ -50,6 +57,12 @@ export default function useKiteWebSocket() {
         watchlist = useTradingStore.getState().watchlist;
         attempts++;
       }
+      console.log(
+        "🔹 [5] watchlist length after wait:",
+        watchlist.length,
+        "attempts:",
+        attempts,
+      );
       if (!watchlist.length) return;
 
       //   // Get tokens for watchlist stocks
@@ -66,15 +79,20 @@ export default function useKiteWebSocket() {
           try {
             const r = await fetch(`/api/kite/instruments?symbol=${s.symbol}`);
             const data = await r.json();
-            console.log(`Token lookup for ${s.symbol}:`, data); // ← add this
             if (data.token) tokenMap[s.symbol] = data.token;
           } catch (err) {
-            console.error(`Token fetch failed for ${s.symbol}:`, err); // ← add this
+            console.error("🔴 Token fetch failed for", s.symbol, err);
           }
         }),
       );
-      console.log("Final tokenMap:", tokenMap); // ← add this
+
       const tokens = Object.values(tokenMap);
+      console.log(
+        "🔹 [6] Final tokens count:",
+        tokens.length,
+        "tokenMap:",
+        tokenMap,
+      );
       if (!tokens.length) return;
       tokenMapRef.current = tokenMap;
 
@@ -83,20 +101,19 @@ export default function useKiteWebSocket() {
         `wss://ws.kite.trade?api_key=${apiKey}&access_token=${accessToken}`,
       );
       wsRef.current = ws;
+      console.log("🔹 [7] WebSocket object created");
 
       ws.onopen = () => {
         isConnectedRef.current = true;
-        console.log("✅ Kite WS connected at", new Date().toLocaleTimeString());
+        console.log(
+          "✅ [8] Kite WS connected at",
+          new Date().toLocaleTimeString(),
+        );
 
-        // Subscribe to tokens in full mode (OHLC + last price)
-        const subscribeMsg = {
-          a: "subscribe",
-          v: tokens,
-        };
-        const modeMsg = {
-          a: "mode",
-          v: ["full", tokens],
-        };
+        const subscribeMsg = { a: "subscribe", v: tokens };
+        const modeMsg = { a: "mode", v: ["full", tokens] };
+        console.log("🔹 [9] Sending subscribe:", JSON.stringify(subscribeMsg));
+        console.log("🔹 [10] Sending mode:", JSON.stringify(modeMsg));
         ws.send(JSON.stringify(subscribeMsg));
         ws.send(JSON.stringify(modeMsg));
 
@@ -105,25 +122,22 @@ export default function useKiteWebSocket() {
 
       ws.onmessage = (event) => {
         console.log(
-          "WS message received, type:",
+          "🔹 [11] onmessage fired, type:",
           typeof event.data,
+          "isBlob:",
           event.data instanceof Blob,
-        ); // ← add this
-
-        // Kite sends binary data
+        );
         if (event.data instanceof Blob) {
           const reader = new FileReader();
           reader.onload = () => {
             console.log(
-              "FileReader onload fired, buffer:",
+              "🔹 [12] FileReader onload, byteLength:",
               reader.result?.byteLength,
             );
-
-            const buffer = reader.result;
-            parseTick(buffer);
+            parseTick(reader.result);
           };
           reader.onerror = (err) => {
-            console.error("FileReader error:", err);
+            console.error("🔴 [12-ERR] FileReader error:", err);
           };
           reader.readAsArrayBuffer(event.data);
         }
@@ -132,18 +146,18 @@ export default function useKiteWebSocket() {
       ws.onclose = (event) => {
         isConnectedRef.current = false;
         console.log(
-          "❌ Kite WS disconnected at",
+          "❌ [13] Kite WS disconnected at",
           new Date().toLocaleTimeString(),
           "code:",
           event.code,
           "reason:",
           event.reason,
         );
-        console.log("Kite WebSocket disconnected, reconnecting in 5s...");
 
         fetch("/api/kite/status")
           .then((r) => r.json())
           .then(({ connected }) => {
+            console.log("🔹 [14] Reconnect check, still connected:", connected);
             if (connected) {
               reconnectRef.current = setTimeout(connect, 5000);
             }
@@ -153,31 +167,36 @@ export default function useKiteWebSocket() {
       };
 
       ws.onerror = (err) => {
+        console.error("🔴 [15] WebSocket onerror:", err);
         toast.error("Live prices disconnected — please reconnect Kite");
-        console.error("WebSocket error:", err);
         ws.close();
       };
     } catch (err) {
-      console.error("WebSocket connect error:", err);
+      console.error("🔴 [ERR] WebSocket connect error:", err);
     }
   }, []);
 
   const parseTick = useCallback((buffer) => {
     try {
-      console.log("Buffer size:", buffer.byteLength);
+      console.log("🔹 [16] parseTick called, byteLength:", buffer.byteLength);
       const view = new DataView(buffer);
-      if (buffer.byteLength < 2) return;
+      if (buffer.byteLength < 2) {
+        console.log("🔹 [17] Heartbeat/tiny packet, skipping");
+        return;
+      }
 
       const numPackets = view.getInt16(0);
-      console.log("numPackets:", numPackets);
-
+      console.log("🔹 [18] numPackets:", numPackets);
       let offset = 2;
-
       const ticks = [];
 
       for (let i = 0; i < numPackets; i++) {
-        if (offset + 2 > buffer.byteLength) break;
+        if (offset + 2 > buffer.byteLength) {
+          console.log("🔹 [19] Breaking — offset exceeds buffer at packet", i);
+          break;
+        }
         const packetLength = view.getInt16(offset);
+        console.log(`🔹 [20] Packet ${i} length:`, packetLength);
         offset += 2;
 
         if (packetLength >= 44) {
@@ -190,6 +209,7 @@ export default function useKiteWebSocket() {
           const volume = view.getInt32(offset + 32);
           const change = close > 0 ? ((lastPrice - close) / close) * 100 : 0;
 
+          console.log(`🔹 [21] Packet ${i} token:`, token, "price:", lastPrice);
           //   // Find symbol by token
           //   const symbol = Object.keys(INSTRUMENT_TOKENS).find(
           //     (k) => INSTRUMENT_TOKENS[k] === token,
@@ -197,6 +217,10 @@ export default function useKiteWebSocket() {
 
           const symbol = Object.keys(tokenMapRef.current).find(
             (k) => tokenMapRef.current[k] === token,
+          );
+          console.log(
+            `🔹 [22] Matched symbol for token ${token}:`,
+            symbol || "NO MATCH",
           );
 
           if (symbol) {
@@ -211,14 +235,20 @@ export default function useKiteWebSocket() {
               change,
             });
           }
+        } else {
+          console.log(
+            `🔹 [23] Packet ${i} too small (${packetLength} bytes), skipping`,
+          );
         }
         offset += packetLength;
       }
 
+      console.log("🔹 [24] Total ticks extracted:", ticks.length);
+
       if (ticks.length > 0) {
         // Update store with live prices
         console.log(
-          "WS ticks received:",
+          "🟢 [25] WS ticks received:",
           ticks.map((t) => `${t.symbol}: ₹${t.price}`).join(", "),
         );
 
@@ -233,11 +263,13 @@ export default function useKiteWebSocket() {
           }),
         }));
 
+        console.log("🔹 [26] Store updated with new ticks");
+
         // Check stop loss / target for each tick
         checkStopLossTarget(ticks);
       }
     } catch (err) {
-      console.error("Tick parse error:", err);
+      console.error("🔴 [ERR] Tick parse error:", err);
     }
   }, []);
 
@@ -257,7 +289,8 @@ export default function useKiteWebSocket() {
 
         const { stopLoss, target } = memory.lastAnalysis;
 
-        if (target && tick.price >= target) {
+        const targetBuffer = target * 0.998; // 0.2% buffer
+        if (target && currentPrice >= targetBuffer) {
           await sellStock(holding.symbol, holding.quantity, tick.price);
           await fetch("/api/outcome", {
             method: "POST",
