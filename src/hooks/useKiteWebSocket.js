@@ -86,13 +86,16 @@ export default function useKiteWebSocket() {
         }),
       );
 
-      const tokens = Object.values(tokenMap);
+      const tokens = Object.values(tokenMap).map((t) => Number(t)); // ← Number() se explicitly convert
       console.log(
         "🔹 [6] Final tokens count:",
         tokens.length,
         "tokenMap:",
         tokenMap,
+        "tokens:",
+        tokens,
       );
+
       if (!tokens.length) return;
       tokenMapRef.current = tokenMap;
 
