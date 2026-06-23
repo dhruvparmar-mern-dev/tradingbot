@@ -218,9 +218,18 @@ export default function useKiteWebSocket() {
           //     (k) => INSTRUMENT_TOKENS[k] === token,
           //   );
 
-          const symbol = Object.keys(tokenMapRef.current).find(
-            (k) => Number(tokenMapRef.current[k]) === token,
-          );
+          const symbol = Object.keys(tokenMapRef.current).find((k) => {
+            const mapValue = Number(tokenMapRef.current[k]);
+            const match = mapValue === token;
+            if (k === "LT.NS" || k === "SBIN.NS") {
+              // sirf 1-2 specific stocks pe debug karo
+              console.log(
+                `Comparing ${k}: mapValue=${mapValue} (${typeof mapValue}) vs token=${token} (${typeof token}) → match=${match}`,
+              );
+            }
+            return match;
+          });
+
           console.log(
             `🔹 [22] Matched symbol for token ${token}:`,
             symbol || "NO MATCH",
