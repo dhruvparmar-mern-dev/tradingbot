@@ -219,7 +219,7 @@ export default function useKiteWebSocket() {
           //   );
 
           const symbol = Object.keys(tokenMapRef.current).find(
-            (k) => tokenMapRef.current[k] === token,
+            (k) => Number(tokenMapRef.current[k]) === token,
           );
           console.log(
             `🔹 [22] Matched symbol for token ${token}:`,
