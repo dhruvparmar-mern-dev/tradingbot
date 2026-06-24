@@ -33,28 +33,22 @@ export async function GET(request) {
     const low = data.ohlc.low;
     const open = data.ohlc.open;
 
-    // Sanity check — flag suspicious high/low values
-    if (
-      high > lastPrice * 1.5 ||
-      low < lastPrice * 0.5 ||
-      high < lastPrice * 0.5 ||
-      low > lastPrice * 1.5
-    ) {
-      console.error(
-        "🔴 SUSPICIOUS high/low:",
-        symbol,
-        "price:",
-        lastPrice,
-        "high:",
-        high,
-        "low:",
-        low,
-        "open:",
-        open,
-        "raw ohlc:",
-        JSON.stringify(data.ohlc),
-      );
-    }
+    console.log(
+      "📊 Quote data:",
+      symbol,
+      "price:",
+      lastPrice,
+      "high:",
+      high,
+      "low:",
+      low,
+      "open:",
+      open,
+      "prevClose:",
+      prevClose,
+      "raw ohlc:",
+      JSON.stringify(data.ohlc),
+    );
 
     return NextResponse.json({
       symbol,

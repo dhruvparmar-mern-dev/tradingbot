@@ -4,12 +4,24 @@ export async function runAnalysis(stock, tradingMode, forceFreshChart = false) {
   );
   const memoryData = await memoryRes.json();
   const hasMemory = memoryData && memoryData.lastAnalysis;
-  const needsChart = !hasMemory || forceFreshChart; // ← key change
+
+  const needsChart = !hasMemory || forceFreshChart;
+
+  // Check Kite connection to pick correct chart source
+  let chartEndpoint = `/api/chart?symbol=${stock.symbol}`;
+  if (needsChart) {
+    const kiteRes = await fetch("/api/kite/status");
+    const { connected: kiteConnected } = await kiteRes.json();
+    if (kiteConnected) {
+      const rangeParam = tradingMode === "intraday" ? "&range=5D" : "&range=3M";
+      chartEndpoint = `/api/kite/historical?symbol=${stock.symbol}&mode=${tradingMode}${rangeParam}`;
+    }
+  }
 
   const fetchPromises = [
     fetch(`/api/news?symbol=${stock.symbol}`),
     fetch(`/api/market-context?symbol=${stock.symbol}`),
-    ...(needsChart ? [fetch(`/api/chart?symbol=${stock.symbol}`)] : []),
+    ...(needsChart ? [fetch(chartEndpoint)] : []),
   ];
   const responses = await Promise.all(fetchPromises);
   const newsData = await responses[0].json();

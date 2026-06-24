@@ -19,13 +19,9 @@ export async function GET(request) {
   kite.setAccessToken(session.accessToken);
 
   try {
-    // Get instrument token
     const cleanSymbol = symbol.replace(".NS", "").replace(".BO", "");
     const instruments = await getNSEInstruments();
     const instrument = instruments.find((i) => i.tradingsymbol === cleanSymbol);
-    if (!instrument)
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-
     if (!instrument)
       return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -60,6 +56,40 @@ export async function GET(request) {
       now,
     );
 
+    // Log raw data sample
+    console.log(
+      "📈 Historical raw sample:",
+      symbol,
+      "interval:",
+      interval,
+      "total candles:",
+      data.length,
+      "first:",
+      JSON.stringify(data[0]),
+      "last:",
+      JSON.stringify(data[data.length - 1]),
+    );
+
+    // Sanity check across all candles — flag any wild outlier vs median close
+    const closes = data
+      .map((c) => c.close)
+      .filter(Boolean)
+      .sort((a, b) => a - b);
+    const median = closes[Math.floor(closes.length / 2)];
+    const outliers = data.filter(
+      (c) => c.high > median * 3 || c.low < median / 3,
+    );
+    if (outliers.length > 0) {
+      console.error(
+        "🔴 OUTLIER candles detected:",
+        symbol,
+        "median close:",
+        median,
+        "outliers:",
+        JSON.stringify(outliers),
+      );
+    }
+
     return NextResponse.json({
       candles: data.map((c) => ({
         date: new Date(c.date).toLocaleString("en-IN"),
@@ -73,7 +103,7 @@ export async function GET(request) {
       interval,
     });
   } catch (err) {
-    console.error("Historical error:", err.message, err.stack);
+    console.error("Historical error:", err.message);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

@@ -196,8 +196,6 @@ export default function useKiteWebSocket() {
           }),
         }));
 
-        console.log("🔹 [26] Store updated with new ticks");
-
         // Check stop loss / target for each tick
         checkStopLossTarget(ticks);
       }
