@@ -151,18 +151,14 @@ export default function useKiteWebSocket() {
         if (packetLength >= 44) {
           const token = view.getInt32(offset);
           const lastPrice = view.getInt32(offset + 4) / 100;
-          const high = view.getInt32(offset + 16) / 100;
-          const low = view.getInt32(offset + 20) / 100;
-          const open = view.getInt32(offset + 24) / 100;
-          const close = view.getInt32(offset + 28) / 100;
-          const volume = view.getInt32(offset + 32);
+          const volume = view.getInt32(offset + 16); // ← volume yahan hai, high/low nahi
+          const open = view.getInt32(offset + 28) / 100; // ← sahi offset
+          const high = view.getInt32(offset + 32) / 100; // ← sahi offset
+          const low = view.getInt32(offset + 36) / 100; // ← sahi offset
+          const close = view.getInt32(offset + 40) / 100; // ← sahi offset
           const change = close > 0 ? ((lastPrice - close) / close) * 100 : 0;
 
           //   // Find symbol by token
-          //   const symbol = Object.keys(INSTRUMENT_TOKENS).find(
-          //     (k) => INSTRUMENT_TOKENS[k] === token,
-          //   );
-
           const symbol = Object.keys(tokenMapRef.current).find(
             (k) => Number(tokenMapRef.current[k]) === token,
           );
