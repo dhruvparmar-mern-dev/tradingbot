@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import useTradingStore from "@/store/tradingStore";
 import { toast } from "sonner";
-import { runAnalysis as reanalyzeStock } from "@/lib/runAnalysis";
+import { runAnalysis as reanalyzeStock, runAnalysis } from "@/lib/runAnalysis";
 
 export default function useAutoTrader() {
   const intervalRef = useRef(null);
@@ -122,8 +122,8 @@ export default function useAutoTrader() {
 
             const { stopLoss, target } = memory.lastAnalysis;
             const currentPrice = priceData.price;
-            const targetBuffer = target * 0.998; // 0.2% buffer
-            if (target && currentPrice >= targetBuffer) {
+            // const targetBuffer = target * 0.998; // 0.2% buffer
+            if (target && currentPrice >= target) {
               await sellStock(holding.symbol, holding.quantity, currentPrice);
               await fetch("/api/outcome", {
                 method: "POST",
@@ -137,6 +137,15 @@ export default function useAutoTrader() {
               });
               toast.success(
                 `🎯 Target hit! Sold ${holding.symbol?.replace(".NS", "")} at ₹${currentPrice}`,
+              );
+
+              // NEW: Trigger fresh analysis immediately so bot can catch next opportunity
+              runAnalysis(
+                { ...holding, price: currentPrice },
+                holdingMode,
+                true,
+              ).catch((err) =>
+                console.error("Post-sell re-analysis failed:", err),
               );
             } else if (stopLoss && currentPrice <= stopLoss) {
               await sellStock(holding.symbol, holding.quantity, currentPrice);
@@ -152,6 +161,14 @@ export default function useAutoTrader() {
               });
               toast.error(
                 `🛑 Stop loss hit! Sold ${holding.symbol?.replace(".NS", "")} at ₹${currentPrice}`,
+              );
+              // NEW: Trigger fresh analysis immediately
+              runAnalysis(
+                { ...holding, price: currentPrice },
+                holdingMode,
+                true,
+              ).catch((err) =>
+                console.error("Post-sell re-analysis failed:", err),
               );
             }
           } catch (err) {

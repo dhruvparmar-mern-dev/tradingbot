@@ -215,9 +215,8 @@ export default function useKiteWebSocket() {
         if (!memory?.lastAnalysis) continue;
 
         const { stopLoss, target } = memory.lastAnalysis;
-
-        const targetBuffer = target * 0.998; // 0.2% buffer
-        if (target && currentPrice >= targetBuffer) {
+        // const targetBuffer = target * 0.998; // 0.2% buffer
+        if (target && currentPrice >= target) {
           await sellStock(holding.symbol, holding.quantity, tick.price);
           await fetch("/api/outcome", {
             method: "POST",

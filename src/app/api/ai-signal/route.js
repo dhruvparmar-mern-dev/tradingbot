@@ -55,6 +55,14 @@ Resistance: ₹${indicators.resistance}
 `
     : "No technical data available";
 
+  const costAwarenessText = `
+TRANSACTION COST AWARENESS:
+- Every round-trip trade (buy + sell) costs approximately ₹50-60 in brokerage, STT, and other charges, regardless of trade size.
+- For a trade to be genuinely profitable after costs, the target must represent AT LEAST a 1% move from entry price (1.5% preferred for higher confidence).
+- Do NOT suggest BUY signals where the target is less than 1% above entry price — such trades are not worth taking even if technically valid, since transaction costs will exceed the profit.
+- If technicals only support a sub-1% move, signal should be HOLD instead of BUY, regardless of other positive factors.
+`;
+
   // If memory exists → fast analysis with just new info
   // If no memory → deep analysis and build memory
   const prompt = memory
@@ -88,6 +96,8 @@ ${newsText}
 ${marketText}
 
 ${modeText}
+
+${costAwarenessText}
 
 RULES FOR DECISION MAKING:
 - Your PRIMARY signal must come from technical analysis: RSI, MACD, trend, support/resistance, volume confirmation.
@@ -133,6 +143,8 @@ ${newsText}
 ${marketText}
 
 ${modeText}
+
+${costAwarenessText}
 
 RULES FOR DECISION MAKING:
 - Your PRIMARY signal must come from technical analysis: RSI, MACD, trend, support/resistance, volume confirmation.
