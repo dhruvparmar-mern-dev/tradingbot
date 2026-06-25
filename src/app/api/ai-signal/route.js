@@ -29,10 +29,11 @@ Rules:
       ? `
 TRADING MODE: INTRADAY
 - Position must be closed by 3:15 PM IST today
-- Use tighter stop loss (0.3-0.5% from entry)
-- Target should be realistic for same day (0.5-1%)
+- Stop loss should be 0.5-0.7% from entry (tight, but not so tight that normal volatility triggers it)
+- Target should be 1-1.5% from entry (must clear transaction costs)
 - High volume confirmation is mandatory for intraday
 - Avoid entry after 2:00 PM IST
+- Risk-reward ratio should be at least 1:1.5 (target distance should exceed stop-loss distance by 50%)
 `
       : `
 TRADING MODE: SWING
