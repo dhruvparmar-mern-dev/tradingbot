@@ -13,7 +13,7 @@ export async function POST(request) {
   await connectDB();
   const { type, symbol, name, quantity, price, mode } = await request.json();
   const total = quantity * price;
-
+  const tradeMode = mode || "swing";
   if (type === "BUY") {
     const updatedUser = await User.findOneAndUpdate(
       { email: user.email, balance: { $gte: total } },
@@ -24,14 +24,14 @@ export async function POST(request) {
       return NextResponse.json({ error: "insufficient" }, { status: 400 });
     }
 
-    const existing = await Portfolio.findOne({ symbol });
+    const existing = await Portfolio.findOne({ symbol, mode });
     let updatedHolding;
 
     if (existing) {
       const newQty = existing.quantity + quantity;
       const newAvg = (existing.avgPrice * existing.quantity + total) / newQty;
       updatedHolding = await Portfolio.findOneAndUpdate(
-        { symbol },
+        { symbol, mode: tradeMode },
         { quantity: newQty, avgPrice: newAvg, updatedAt: new Date() },
         { new: true },
       );
@@ -41,7 +41,7 @@ export async function POST(request) {
         name,
         quantity,
         avgPrice: price,
-        mode: mode || "swing",
+        mode: tradeMode,
       });
     }
 
@@ -51,7 +51,7 @@ export async function POST(request) {
       quantity,
       price,
       total,
-      mode: mode || "swing",
+      mode: tradeMode,
     });
     return NextResponse.json({
       success: true,
@@ -62,7 +62,7 @@ export async function POST(request) {
   }
 
   if (type === "SELL") {
-    const holding = await Portfolio.findOne({ symbol });
+    const holding = await Portfolio.findOne({ symbol, mode: tradeMode });
     if (!holding)
       return NextResponse.json({ error: "no_holding" }, { status: 400 });
     if (quantity > holding.quantity)

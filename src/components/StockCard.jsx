@@ -49,15 +49,27 @@ export default function StockCard({ stock }) {
       console.error(err);
     }
   };
-
   const analyzeStock = async () => {
     setLoading(true);
     try {
-      const needsFreshChart = tradingMode === "intraday";
+      const memCheckRes = await fetch(
+        `/api/memory?symbol=${stock.symbol}&mode=${tradingMode}`,
+      );
+      const existingMemory = await memCheckRes.json();
+      const lastAnalysisAge = existingMemory?.lastAnalysis?.date
+        ? (Date.now() - new Date(existingMemory.lastAnalysis.date).getTime()) /
+          (1000 * 60 * 60) // hours
+        : Infinity;
+
+      const needsFreshChart =
+        tradingMode === "intraday" ||
+        !existingMemory?.lastAnalysis ||
+        lastAnalysisAge > 4;
 
       const result = await runAnalysis(stock, tradingMode, needsFreshChart);
       setSignal(result);
       setNews(result.news || []);
+
       const memRes = await fetch(
         `/api/memory?symbol=${stock.symbol}&mode=${tradingMode}`,
       );
