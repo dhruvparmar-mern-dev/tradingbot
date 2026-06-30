@@ -62,11 +62,23 @@ export async function POST(request) {
   }
 
   if (type === "SELL") {
-    const holding = await Portfolio.findOne({ symbol, mode: tradeMode });
-    if (!holding)
-      return NextResponse.json({ error: "no_holding" }, { status: 400 });
-    if (quantity > holding.quantity)
-      return NextResponse.json({ error: "oversell" }, { status: 400 });
+    const holding = await Portfolio.findOneAndUpdate(
+      { symbol, mode: tradeMode, quantity: { $gte: quantity } },
+      { $inc: { quantity: -quantity } },
+      { new: true },
+    );
+    if (!holding) {
+      return NextResponse.json(
+        { error: "no_holding_or_oversell" },
+        { status: 400 },
+      );
+    }
+    // if (quantity > holding.quantity)
+    //   return NextResponse.json({ error: "oversell" }, { status: 400 });
+
+    if (holding.quantity === 0) {
+      await Portfolio.deleteOne({ symbol, mode: tradeMode });
+    }
 
     const pnl = (price - holding.avgPrice) * quantity;
     let updatedHolding = null;

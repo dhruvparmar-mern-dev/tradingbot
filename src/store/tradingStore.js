@@ -11,6 +11,7 @@ const useTradingStore = create((set, get) => ({
   minConfidence: 7,
   maxPerTrade: 10000,
   tradingMode: "swing",
+  memoryCache: {},
 
   init: async () => {
     if (get().initialized) return;
@@ -163,6 +164,32 @@ const useTradingStore = create((set, get) => ({
     set((state) => ({
       watchlist: state.watchlist.filter((s) => s.symbol !== symbol),
     }));
+  },
+
+  getMemory: async (symbol, mode) => {
+    const key = `${symbol}_${mode}`;
+    const cached = get().memoryCache[key];
+    if (cached && Date.now() - cached.fetchedAt < 30000) {
+      return cached.data;
+    }
+    const res = await fetch(`/api/memory?symbol=${symbol}&mode=${mode}`);
+    const data = await res.json();
+    set((state) => ({
+      memoryCache: {
+        ...state.memoryCache,
+        [key]: { data, fetchedAt: Date.now() },
+      },
+    }));
+    return data;
+  },
+
+  invalidateMemory: (symbol, mode) => {
+    const key = `${symbol}_${mode}`;
+    set((state) => {
+      const newCache = { ...state.memoryCache };
+      delete newCache[key];
+      return { memoryCache: newCache };
+    });
   },
 }));
 

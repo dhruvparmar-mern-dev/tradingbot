@@ -114,10 +114,14 @@ export default function useAutoTrader() {
           const holdingMode = holding.mode || tradingMode; // use the mode this position was bought under
 
           try {
-            const memRes = await fetch(
-              `/api/memory?symbol=${holding.symbol}&mode=${holdingMode}`,
-            );
-            const memory = await memRes.json();
+            // const memRes = await fetch(
+            //   `/api/memory?symbol=${holding.symbol}&mode=${holdingMode}`,
+            // );
+            // const memory = await memRes.json();
+            const memory = await useTradingStore
+              .getState()
+              .getMemory(stock.symbol, tradingMode);
+
             if (!memory?.lastAnalysis) continue;
 
             const { stopLoss, target } = memory.lastAnalysis;
@@ -190,10 +194,14 @@ export default function useAutoTrader() {
               ); // ← move here, uncommented
               if (!priceData) continue;
 
-              const memRes = await fetch(
-                `/api/memory?symbol=${stock.symbol}&mode=${tradingMode}`,
-              );
-              const memory = await memRes.json();
+              // const memRes = await fetch(
+              //   `/api/memory?symbol=${stock.symbol}&mode=${tradingMode}`,
+              // );
+              // const memory = await memRes.json();
+
+              const memory = await useTradingStore
+                .getState()
+                .getMemory(stock.symbol, tradingMode);
               if (!memory?.lastAnalysis) continue;
 
               const { signal, confidence } = memory.lastAnalysis;

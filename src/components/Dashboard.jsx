@@ -11,6 +11,7 @@ export default function Dashboard() {
   const [search, setSearch] = useState("");
   const [searching, setSearching] = useState(false);
   const [activeTab, setActiveTab] = useState("watchlist");
+  const [bulkScanning, setBulkScanning] = useState(false);
 
   const { portfolio, watchlist, tradeLog, addToWatchlist, loadingPrices } =
     useTradingStore();
@@ -43,6 +44,31 @@ export default function Dashboard() {
       toast.error("Error fetching stock");
     } finally {
       setSearching(false);
+    }
+  };
+
+  const scanAllWatchlist = async () => {
+    setBulkScanning(true);
+    try {
+      const symbols = watchlist.map((s) => s.symbol);
+      toast.info(`Analyzing ${symbols.length} stocks...`);
+
+      const res = await fetch("/api/bulk-analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbols, mode: tradingMode }),
+      });
+      const { results } = await res.json();
+
+      const buyCount = results.filter((r) => r.signal === "BUY").length;
+      toast.success(`Scan complete! ${buyCount} BUY signals found.`);
+
+      // Memory cache clear karo, taaki StockCard fresh data dikhaye
+      useTradingStore.setState({ memoryCache: {} });
+    } catch (err) {
+      toast.error("Bulk scan failed");
+    } finally {
+      setBulkScanning(false);
     }
   };
 
@@ -103,6 +129,14 @@ export default function Dashboard() {
             {searching ? "Searching..." : "Add"}
           </button>
         </div>
+
+        <button
+          onClick={scanAllWatchlist}
+          disabled={bulkScanning}
+          className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-medium px-4 py-3 rounded-xl transition-colors"
+        >
+          {bulkScanning ? "Scanning..." : "🔄 Scan All Watchlist"}
+        </button>
 
         <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit">
           {[

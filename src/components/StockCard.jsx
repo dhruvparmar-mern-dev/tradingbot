@@ -30,10 +30,14 @@ export default function StockCard({ stock }) {
 
   const loadExistingSignal = async () => {
     try {
-      const res = await fetch(
-        `/api/memory?symbol=${stock.symbol}&mode=${tradingMode}`,
-      );
-      const data = await res.json();
+      // const res = await fetch(
+      //   `/api/memory?symbol=${stock.symbol}&mode=${tradingMode}`,
+      // );
+      const data = await useTradingStore
+        .getState()
+        .getMemory(stock.symbol, tradingMode);
+
+      // const data = await res.json();
       if (data?.lastAnalysis?.signal) {
         setSignal({
           signal: data.lastAnalysis.signal,
@@ -52,10 +56,14 @@ export default function StockCard({ stock }) {
   const analyzeStock = async () => {
     setLoading(true);
     try {
-      const memCheckRes = await fetch(
-        `/api/memory?symbol=${stock.symbol}&mode=${tradingMode}`,
-      );
-      const existingMemory = await memCheckRes.json();
+      // const memCheckRes = await fetch(
+      //   `/api/memory?symbol=${stock.symbol}&mode=${tradingMode}`,
+      // );
+      const existingMemory = await useTradingStore
+        .getState()
+        .getMemory(stock.symbol, tradingMode);
+
+      // const existingMemory = await memCheckRes.json();
       const lastAnalysisAge = existingMemory?.lastAnalysis?.date
         ? (Date.now() - new Date(existingMemory.lastAnalysis.date).getTime()) /
           (1000 * 60 * 60) // hours
@@ -70,10 +78,14 @@ export default function StockCard({ stock }) {
       setSignal(result);
       setNews(result.news || []);
 
-      const memRes = await fetch(
-        `/api/memory?symbol=${stock.symbol}&mode=${tradingMode}`,
-      );
-      setMemory(await memRes.json());
+      // const memRes = await fetch(
+      //   `/api/memory?symbol=${stock.symbol}&mode=${tradingMode}`,
+      // );
+      // setMemory(await memRes.json());
+      const memRes = await useTradingStore
+        .getState()
+        .getMemory(stock.symbol, tradingMode);
+      setMemory(memRes);
       toast.success("Analysis done!");
     } catch (err) {
       console.error(err);

@@ -208,10 +208,13 @@ export default function useKiteWebSocket() {
       if (!holding) continue;
 
       try {
-        const memRes = await fetch(
-          `/api/memory?symbol=${tick.symbol}&mode=${tradingMode}`,
-        );
-        const memory = await memRes.json();
+        // const memRes = await fetch(
+        //   `/api/memory?symbol=${tick.symbol}&mode=${tradingMode}`,
+        // );
+        // const memory = await memRes.json();
+        const memory = await useTradingStore
+          .getState()
+          .getMemory(stock.symbol, tradingMode);
         if (!memory?.lastAnalysis) continue;
 
         const { stopLoss, target } = memory.lastAnalysis;
