@@ -298,19 +298,39 @@ export default function useAutoTrader() {
             const isForceExitTime = hours === 15 && minutes >= 15;
 
             if (isForceExitTime) {
-              const { portfolio, sellStock } = useTradingStore.getState();
-              for (const holding of portfolio) {
+              const currentPortfolio = useTradingStore.getState().portfolio;
+              for (const holding of currentPortfolio) {
                 const priceData = validPrices.find(
                   (p) => p.symbol === holding.symbol,
                 );
                 if (!priceData) continue;
+
+                const holdingMode = holding.mode || tradingMode;
+
                 await sellStock(
                   holding.symbol,
                   holding.quantity,
                   priceData.price,
                 );
+
+                // Outcome determine karo — profit tha ya loss?
+                const pnl =
+                  (priceData.price - holding.avgPrice) * holding.quantity;
+                const outcome = pnl >= 0 ? "WIN" : "LOSS";
+
+                await fetch("/api/outcome", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    symbol: holding.symbol,
+                    outcome,
+                    price: priceData.price,
+                    mode: holdingMode,
+                  }),
+                });
+
                 toast.warning(
-                  `⏰ 3:15 PM! Force closed ${holding.symbol?.replace(".NS", "")} at ₹${priceData.price}`,
+                  `⏰ 3:15 PM — Force closed ${holding.symbol?.replace(".NS", "")} at ₹${priceData.price} (${outcome})`,
                 );
               }
             }

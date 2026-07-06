@@ -6,6 +6,7 @@ import TradeLog from "./TradeLog";
 import { toast } from "sonner";
 import MarketOverview from "./MarketOverview";
 import AIPicks from "./AIPicks";
+import ReportModal from "./ReportModal";
 
 export default function Dashboard() {
   const [search, setSearch] = useState("");
@@ -13,8 +14,18 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("watchlist");
   const [bulkScanning, setBulkScanning] = useState(false);
 
-  const { portfolio, watchlist, tradeLog, addToWatchlist, loadingPrices } =
-    useTradingStore();
+  const [report, setReport] = useState(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+
+  const {
+    portfolio,
+    watchlist,
+    tradeLog,
+    addToWatchlist,
+    loadingPrices,
+    tradingMode,
+  } = useTradingStore();
 
   const totalInvested = portfolio.reduce(
     (sum, p) => sum + (p.avgPrice || 0) * (p.quantity || 0),
@@ -47,6 +58,22 @@ export default function Dashboard() {
     }
   };
 
+  const fetchReport = async () => {
+    setReportLoading(true);
+    try {
+      const res = await fetch(`/api/report?mode=${tradingMode}`);
+      const data = await res.json();
+      setReport(data);
+      setShowReport(true);
+    } catch (err) {
+      console.error(err);
+
+      toast.error("Report fetch failed");
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
   const scanAllWatchlist = async () => {
     setBulkScanning(true);
     try {
@@ -66,6 +93,8 @@ export default function Dashboard() {
       // Memory cache clear karo, taaki StockCard fresh data dikhaye
       useTradingStore.setState({ memoryCache: {} });
     } catch (err) {
+      console.error(err);
+
       toast.error("Bulk scan failed");
     } finally {
       setBulkScanning(false);
@@ -130,13 +159,22 @@ export default function Dashboard() {
           </button>
         </div>
 
-        <button
-          onClick={scanAllWatchlist}
-          disabled={bulkScanning}
-          className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-medium px-4 py-3 rounded-xl transition-colors"
-        >
-          {bulkScanning ? "Scanning..." : "🔄 Scan All Watchlist"}
-        </button>
+        <div className="flex items-center gap-2 py-2">
+          <button
+            onClick={scanAllWatchlist}
+            disabled={bulkScanning}
+            className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-medium px-4 py-3 rounded-xl transition-colors"
+          >
+            {bulkScanning ? "Scanning..." : "🔄 Scan All Watchlist"}
+          </button>
+          <button
+            onClick={fetchReport}
+            disabled={reportLoading}
+            className="text-xs text-zinc-400 hover:text-white border border-zinc-700 font-medium px-4 py-3 rounded-lg transition-colors"
+          >
+            {reportLoading ? "Loading..." : "📊 Portfolio Report"}
+          </button>
+        </div>
 
         <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit">
           {[
@@ -201,6 +239,10 @@ export default function Dashboard() {
           ) : (
             <TradeLog />
           ))}
+
+        {showReport && (
+          <ReportModal report={report} onClose={() => setShowReport(false)} />
+        )}
       </div>
     </div>
   );
