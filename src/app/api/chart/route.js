@@ -34,7 +34,9 @@ export async function GET(request) {
     // Build candles array
     const candles = timestamps
       .map((t, i) => ({
-        date: new Date(t * 1000).toLocaleDateString("en-IN"),
+        date: new Date(t * 1000).toLocaleDateString("en-IN", {
+          timeZone: "Asia/Kolkata",
+        }),
         open: quotes.open[i]?.toFixed(2),
         high: highs[i]?.toFixed(2),
         low: lows[i]?.toFixed(2),

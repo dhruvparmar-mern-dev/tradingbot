@@ -92,7 +92,9 @@ export async function GET(request) {
 
     return NextResponse.json({
       candles: data.map((c) => ({
-        date: new Date(c.date).toLocaleString("en-IN"),
+        date: new Date(c.date).toLocaleString("en-IN", {
+          timeZone: "Asia/Kolkata",
+        }),
         open: c.open,
         high: c.high,
         low: c.low,

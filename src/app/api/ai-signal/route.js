@@ -80,7 +80,7 @@ YOUR MEMORY OF ${stockData.symbol}:
 Character: ${memory.character}
 Known Behavior: ${memory.behavior}
 Key Levels: Support ₹${memory.keyLevels?.support} | Resistance ₹${memory.keyLevels?.resistance}
-Last Signal: ${memory.lastAnalysis?.signal} on ${new Date(memory.lastAnalysis?.date).toLocaleDateString("en-IN")} at ₹${memory.lastAnalysis?.price || "unknown"}
+Last Signal: ${memory.lastAnalysis?.signal} on ${new Date(memory.lastAnalysis?.date).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })} at ₹${memory.lastAnalysis?.price || "unknown"}
 Past Signals: ${memory.signalHistory?.length || 0} signals recorded
 Win Rate: ${memory.winRate ?? "N/A"}% (${memory.completedSignals || 0} completed out of ${memory.totalSignals || 0} total signals)
 Recent Outcomes: ${
