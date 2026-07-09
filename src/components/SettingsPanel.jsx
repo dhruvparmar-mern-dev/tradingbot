@@ -16,10 +16,12 @@ export default function SettingsPanel({ onLogout }) {
     minConfidence,
     maxPerTrade,
     tradingMode,
+    dailyAiBudgetUSD,
     setAutoTrade,
     setMinConfidence,
     setMaxPerTrade,
     setTradingMode,
+    setDailyAiBudgetUSD,
   } = useTradingStore();
 
   return (
@@ -119,6 +121,22 @@ export default function SettingsPanel({ onLogout }) {
           step={1000}
           value={[maxPerTrade]}
           onValueChange={([v]) => setMaxPerTrade(v)}
+        />
+      </div>
+
+      <div>
+        <div className="flex justify-between mb-2">
+          <span className="text-sm text-zinc-300">Daily AI Budget</span>
+          <span className="text-sm text-foreground font-medium">
+            ${dailyAiBudgetUSD.toFixed(2)}
+          </span>
+        </div>
+        <Slider
+          min={0.1}
+          max={5}
+          step={0.1}
+          value={[dailyAiBudgetUSD]}
+          onValueChange={([v]) => setDailyAiBudgetUSD(v)}
         />
       </div>
 

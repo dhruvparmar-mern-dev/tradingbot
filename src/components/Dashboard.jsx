@@ -8,6 +8,7 @@ import MarketOverview from "./MarketOverview";
 import AIPicks from "./AIPicks";
 import MarketScan from "./MarketScan";
 import ReportModal from "./ReportModal";
+import AiUsageTab from "./AiUsageTab";
 
 export default function Dashboard() {
   const [search, setSearch] = useState("");
@@ -183,6 +184,7 @@ export default function Dashboard() {
             { key: "watchlist", label: `Watchlist (${watchlist.length})` },
             { key: "portfolio", label: `Portfolio (${portfolio.length})` },
             { key: "trades", label: `Trades (${tradeLog.length})` },
+            { key: "aiUsage", label: "AI Usage" },
           ].map((tab) => (
             <button
               key={tab.key}
@@ -241,6 +243,8 @@ export default function Dashboard() {
           ) : (
             <TradeLog />
           ))}
+
+        {!loadingPrices && activeTab === "aiUsage" && <AiUsageTab />}
 
         {showReport && (
           <ReportModal report={report} onClose={() => setShowReport(false)} />

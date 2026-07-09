@@ -20,6 +20,7 @@ export async function POST(request) {
         maxPerTrade: body.maxPerTrade ?? user.maxPerTrade,
         tradingMode: body.tradingMode ?? user.tradingMode,
         balance: body.balance ?? user.balance,
+        dailyAiBudgetUSD: body.dailyAiBudgetUSD ?? user.dailyAiBudgetUSD,
       },
     },
     { new: true },

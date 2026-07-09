@@ -11,6 +11,7 @@ const useTradingStore = create((set, get) => ({
   minConfidence: 7,
   maxPerTrade: 10000,
   tradingMode: "swing",
+  dailyAiBudgetUSD: 1.0,
   memoryCache: {},
 
   init: async () => {
@@ -38,6 +39,7 @@ const useTradingStore = create((set, get) => ({
         minConfidence: user.minConfidence ?? 7,
         maxPerTrade: user.maxPerTrade ?? 10000,
         tradingMode: user.tradingMode ?? "swing",
+        dailyAiBudgetUSD: user.dailyAiBudgetUSD ?? 1.0,
         initialized: true,
       });
     } catch (err) {
@@ -79,6 +81,15 @@ const useTradingStore = create((set, get) => ({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tradingMode: val }),
+    });
+  },
+
+  setDailyAiBudgetUSD: async (val) => {
+    set({ dailyAiBudgetUSD: val });
+    await fetch("/api/user/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dailyAiBudgetUSD: val }),
     });
   },
 

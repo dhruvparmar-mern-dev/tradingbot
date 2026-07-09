@@ -254,7 +254,25 @@ export default function useAutoTrader() {
               // );
               // if (!priceData) continue;
 
-              const quantity = Math.floor(maxPerTrade / priceData.price);
+              // maxPerTrade is a spend cap (never buy more ₹ than this), but a
+              // wide stop-loss on a volatile stock could still mean losing
+              // most of that ₹ in one trade. Also cap the ACTUAL loss if
+              // stopped out to a fraction of maxPerTrade, so quantity shrinks
+              // for volatile stocks with far-away stops, not just cheap ones.
+              const MAX_RISK_FRACTION_OF_TRADE = 0.2;
+              const budgetBasedQty = Math.floor(maxPerTrade / priceData.price);
+              const stopLoss = memory.lastAnalysis.stopLoss;
+              const stopLossDistance = stopLoss
+                ? Math.abs(priceData.price - stopLoss)
+                : null;
+              const riskBasedQty = stopLossDistance
+                ? Math.floor(
+                    (maxPerTrade * MAX_RISK_FRACTION_OF_TRADE) /
+                      stopLossDistance,
+                  )
+                : budgetBasedQty;
+
+              const quantity = Math.min(budgetBasedQty, riskBasedQty);
               if (quantity < 1) continue;
 
               const { balance } = useTradingStore.getState();

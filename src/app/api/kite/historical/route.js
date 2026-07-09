@@ -3,7 +3,7 @@ import kite from "@/lib/kite";
 import { connectDB } from "@/lib/mongoose";
 import KiteSession from "@/models/KiteSession";
 import { getNSEInstruments } from "@/lib/kiteInstruments";
-import { computeIndicators } from "@/lib/indicators";
+import { computeIndicators, calculateVWAP } from "@/lib/indicators";
 
 export async function GET(request) {
   await connectDB();
@@ -82,7 +82,7 @@ export async function GET(request) {
     );
     if (outliers.length > 0) {
       console.error(
-        "🔴 OUTLIER candles detected:",
+        "🔴 OUTLIER candles detected, excluding from indicators/chart:",
         symbol,
         "median close:",
         median,
@@ -91,15 +91,37 @@ export async function GET(request) {
       );
     }
 
+    // Drop the bad ticks so they don't corrupt RSI/MACD/support-resistance
+    const cleanData = data.filter(
+      (c) => !(c.high > median * 3 || c.low < median / 3),
+    );
+
     const indicators = computeIndicators({
-      closes: data.map((c) => c.close),
-      highs: data.map((c) => c.high),
-      lows: data.map((c) => c.low),
-      volumes: data.map((c) => c.volume),
+      closes: cleanData.map((c) => c.close),
+      highs: cleanData.map((c) => c.high),
+      lows: cleanData.map((c) => c.low),
+      volumes: cleanData.map((c) => c.volume),
     });
 
+    // VWAP only means anything within a single session — only compute it for
+    // intraday, scoped to today's candles.
+    if (mode === "intraday" && cleanData.length > 0) {
+      const todayStr = new Date(cleanData.at(-1).date).toDateString();
+      const todaysCandles = cleanData.filter(
+        (c) => new Date(c.date).toDateString() === todayStr,
+      );
+      const vwap = calculateVWAP(
+        todaysCandles.map((c) => c.high),
+        todaysCandles.map((c) => c.low),
+        todaysCandles.map((c) => c.close),
+        todaysCandles.map((c) => c.volume),
+      );
+      indicators.vwap = vwap != null ? vwap.toFixed(2) : null;
+      indicators.vwapCandleCount = todaysCandles.length;
+    }
+
     return NextResponse.json({
-      candles: data.map((c) => ({
+      candles: cleanData.map((c) => ({
         date: new Date(c.date).toLocaleString("en-IN", {
           timeZone: "Asia/Kolkata",
         }),

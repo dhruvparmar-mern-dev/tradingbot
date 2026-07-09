@@ -1,13 +1,65 @@
 import { NextResponse } from "next/server";
+import { connectDB } from "@/lib/mongoose";
+import AiUsage from "@/models/AiUsage";
+import { getUser } from "@/lib/auth";
+
+// Sonnet 5 intro pricing runs through 2026-08-31 — update to $3 / $15 after that.
+const PRICING = {
+  "claude-sonnet-5": { input: 2.0, output: 10.0 },
+};
+
+function estimateCost(model, usage) {
+  const rate = PRICING[model];
+  if (!rate || !usage) return null;
+  return (
+    (usage.input_tokens / 1e6) * rate.input +
+    (usage.output_tokens / 1e6) * rate.output
+  );
+}
 
 export async function POST(request) {
   const { stockData, news, chartData, memory, marketContext, tradingMode } =
     await request.json();
 
-  const newsText =
-    news.length > 0
-      ? news.map((n) => `- ${n.title} (${n.source})`).join("\n")
-      : "No news available";
+  await connectDB();
+  const sessionUser = await getUser();
+  const dailyBudget = sessionUser?.dailyAiBudgetUSD ?? 1.0;
+
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const [{ total: spentToday } = { total: 0 }] = await AiUsage.aggregate([
+    { $match: { time: { $gte: startOfDay } } },
+    { $group: { _id: null, total: { $sum: "$costUSD" } } },
+  ]);
+
+  if (spentToday >= dailyBudget) {
+    return NextResponse.json(
+      {
+        error: `Daily AI budget of $${dailyBudget.toFixed(2)} reached ($${spentToday.toFixed(4)} spent today). Raise the limit in Settings or try again tomorrow.`,
+      },
+      { status: 429 },
+    );
+  }
+
+  // News is deliberately not fed into the decision — trading only on technicals
+  // + market context for now. Re-enable by uncommenting this and the
+  // NEW NEWS TODAY / RECENT NEWS sections below.
+  // const newsText =
+  //   news.length > 0
+  //     ? news
+  //         .map((n) => {
+  //           const age =
+  //             n.daysAgo == null
+  //               ? ""
+  //               : n.daysAgo === 0
+  //                 ? ", today"
+  //                 : n.daysAgo === 1
+  //                   ? ", 1 day ago"
+  //                   : `, ${n.daysAgo} days ago`;
+  //           return `- ${n.title} (${n.source}${age})`;
+  //         })
+  //         .join("\n")
+  //     : "No news available";
 
   const marketText = marketContext
     ? `
@@ -29,8 +81,8 @@ Rules:
       ? `
 TRADING MODE: INTRADAY
 - Position must be closed by 3:15 PM IST today
-- Stop loss should be 0.5-0.7% from entry (tight, but not so tight that normal volatility triggers it)
-- Target should be 1-1.5% from entry (must clear transaction costs)
+- Stop loss should be approximately 0.75x-1x ATR from entry (use the ATR value given below — this scales to how much THIS stock actually moves, not a fixed %)
+- Target should be approximately 1.5x-2x ATR from entry, and must still clear at least a 1% move (see cost awareness below)
 - High volume confirmation is mandatory for intraday
 - Avoid entry after 2:00 PM IST
 - Risk-reward ratio should be at least 1:1.5 (target distance should exceed stop-loss distance by 50%)
@@ -38,8 +90,8 @@ TRADING MODE: INTRADAY
       : `
 TRADING MODE: SWING
 - Can hold position for 2-5 days
-- Wider stop loss acceptable (1-2% from entry)
-- Target can be 3-5% move
+- Stop loss should be approximately 1.5x-2x ATR from entry (use the ATR value given below)
+- Target should be approximately 3x-4x ATR from entry
 - Volume less critical than trend
 `;
 
@@ -53,10 +105,20 @@ TRADING MODE: SWING
   const technicalText = hasValidIndicators
     ? `
 TECHNICAL ANALYSIS:
-Trend: ${indicators.trend} (${indicators.trendStrength} over 20 days)
+Trend: ${indicators.trend} (price is ${indicators.trendStrength} vs its 20-period EMA)
 RSI (14): ${indicators.rsi} ${indicators.rsi > 70 ? "⚠️ Overbought" : indicators.rsi < 30 ? "⚠️ Oversold" : "✅ Neutral"}
 MACD: ${indicators.macd.value} | Signal: ${indicators.macd.signal} | Histogram: ${indicators.macd.histogram}
 MACD Crossover: ${indicators.macd.crossover}
+ATR (14): ₹${indicators.atr ?? "N/A"} — use this to size stop-loss/target (see trading mode rules below), not a fixed %
+${
+  indicators.vwap
+    ? `VWAP (today): ₹${indicators.vwap} — price is currently ${stockData.price >= indicators.vwap ? "ABOVE" : "BELOW"} VWAP (${stockData.price >= indicators.vwap ? "bullish" : "bearish"} intraday bias)${
+        indicators.vwapCandleCount != null && indicators.vwapCandleCount < 6
+          ? ` — ⚠️ only ${indicators.vwapCandleCount} candles into the session (< 30 min since open), VWAP is not settled yet, treat as low-confidence`
+          : ""
+      }`
+    : ""
+}
 Support: ₹${indicators.support}
 Resistance: ₹${indicators.resistance}
 `
@@ -100,9 +162,6 @@ High: ₹${stockData.high} | Low: ₹${stockData.low}
 Volume: ${stockData.volume?.toLocaleString()}
 ${technicalText}
 
-NEW NEWS TODAY:
-${newsText}
-
 ${marketText}
 
 ${modeText}
@@ -110,11 +169,10 @@ ${modeText}
 ${costAwarenessText}
 
 RULES FOR DECISION MAKING:
-- Your PRIMARY signal must come from technical analysis: RSI, MACD, trend, support/resistance, volume confirmation.
-- News and market context are SECONDARY — use them only to:
-  (a) avoid trades during clearly negative fundamental events (scam, regulatory action, major selloff), or
-  (b) add minor confidence when technicals and news align.
-- Do NOT generate a BUY/SELL signal primarily because of news sentiment alone. If technicals are neutral/weak, say HOLD even if news sounds positive.
+- Your signal must come from technical analysis: RSI, MACD, trend, support/resistance, volume confirmation.
+- Market context (NIFTY/sector) is SECONDARY — use it only to:
+  (a) avoid trades during a clearly bearish broad market, or
+  (b) add minor confidence when technicals and market context align.
 
 Based on your memory + today's update, give a quick decision.
 Respond in this exact JSON format only, no extra text:
@@ -147,9 +205,6 @@ Volume: ${stockData.volume?.toLocaleString()}
 
 ${technicalText}
 
-RECENT NEWS:
-${newsText}
-
 ${marketText}
 
 ${modeText}
@@ -157,17 +212,16 @@ ${modeText}
 ${costAwarenessText}
 
 RULES FOR DECISION MAKING:
-- Your PRIMARY signal must come from technical analysis: RSI, MACD, trend, support/resistance, volume confirmation.
-- News and market context are SECONDARY — use them only to:
-  (a) avoid trades during clearly negative fundamental events (scam, regulatory action, major selloff), or
-  (b) add minor confidence when technicals and news align.
-- Do NOT generate a BUY/SELL signal primarily because of news sentiment alone. If technicals are neutral/weak, say HOLD even if news sounds positive.
+- Your signal must come from technical analysis: RSI, MACD, trend, support/resistance, volume confirmation.
+- Market context (NIFTY/sector) is SECONDARY — use it only to:
+  (a) avoid trades during a clearly bearish broad market, or
+  (b) add minor confidence when technicals and market context align.
 
 Respond in this exact JSON format only, no extra text:
 {
   "signal": "BUY" or "SELL" or "HOLD",
   "confidence": number 1-10,
-  "reason": "3-4 lines with full analysis mentioning RSI, MACD, trend and news",
+  "reason": "3-4 lines with full analysis mentioning RSI, MACD, trend and support/resistance",
   "stopLoss": number,
   "target": number,
   "riskLevel": "LOW" or "MEDIUM" or "HIGH",
@@ -187,15 +241,27 @@ Respond in this exact JSON format only, no extra text:
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-6",
+      model: "claude-sonnet-5",
       max_tokens: 1000,
+      thinking: { type: "disabled" },
       messages: [{ role: "user", content: prompt }],
     }),
   });
 
   const data = await res.json();
+  const model = "claude-sonnet-5";
+  const cost = estimateCost(model, data.usage);
 
   if (!data.content || !data.content[0]) {
+    await AiUsage.create({
+      symbol: stockData.symbol,
+      mode: tradingMode,
+      signal: null,
+      model,
+      inputTokens: data.usage?.input_tokens,
+      outputTokens: data.usage?.output_tokens,
+      costUSD: cost,
+    });
     return NextResponse.json(
       { error: data.error?.message || "AI analysis failed" },
       { status: 500 },
@@ -205,7 +271,17 @@ Respond in this exact JSON format only, no extra text:
   const clean = text.replace(/```json|```/g, "").trim();
 
   try {
-    return NextResponse.json(JSON.parse(clean));
+    const parsed = JSON.parse(clean);
+    await AiUsage.create({
+      symbol: stockData.symbol,
+      mode: tradingMode,
+      signal: parsed.signal,
+      model,
+      inputTokens: data.usage?.input_tokens,
+      outputTokens: data.usage?.output_tokens,
+      costUSD: cost,
+    });
+    return NextResponse.json(parsed);
   } catch (err) {
     console.error("JSON parse error:", clean);
     return NextResponse.json(
