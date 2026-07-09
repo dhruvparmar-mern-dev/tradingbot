@@ -56,25 +56,21 @@ export default function StockCard({ stock }) {
   const analyzeStock = async () => {
     setLoading(true);
     try {
-      // const memCheckRes = await fetch(
-      //   `/api/memory?symbol=${stock.symbol}&mode=${tradingMode}`,
-      // );
-      const existingMemory = await useTradingStore
-        .getState()
-        .getMemory(stock.symbol, tradingMode);
+      // const existingMemory = await useTradingStore
+      //   .getState()
+      //   .getMemory(stock.symbol, tradingMode);
 
-      // const existingMemory = await memCheckRes.json();
-      const lastAnalysisAge = existingMemory?.lastAnalysis?.date
-        ? (Date.now() - new Date(existingMemory.lastAnalysis.date).getTime()) /
-          (1000 * 60 * 60) // hours
-        : Infinity;
+      // const lastAnalysisAge = existingMemory?.lastAnalysis?.date
+      //   ? (Date.now() - new Date(existingMemory.lastAnalysis.date).getTime()) /
+      //     (1000 * 60 * 60) // hours
+      //   : Infinity;
 
-      const needsFreshChart =
-        tradingMode === "intraday" ||
-        !existingMemory?.lastAnalysis ||
-        lastAnalysisAge > 4;
+      // const needsFreshChart =
+      //   tradingMode === "intraday" ||
+      //   !existingMemory?.lastAnalysis ||
+      //   lastAnalysisAge > 4;
 
-      const result = await runAnalysis(stock, tradingMode, needsFreshChart);
+      const result = await runAnalysis(stock, tradingMode, true);
       setSignal(result);
       setNews(result.news || []);
 

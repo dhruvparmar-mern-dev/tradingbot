@@ -313,19 +313,21 @@ export default function useAutoTrader() {
                   priceData.price,
                 );
 
-                // Outcome determine karo — profit tha ya loss?
+                // Force-exit wale block mein:
                 const pnl =
                   (priceData.price - holding.avgPrice) * holding.quantity;
-                const outcome = pnl >= 0 ? "WIN" : "LOSS";
+                // Outcome determine karo — profit tha ya loss?
+                // const outcome = pnl >= 0 ? "WIN" : "LOSS";
 
                 await fetch("/api/outcome", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
                     symbol: holding.symbol,
-                    outcome,
+                    outcome: "FORCED_EXIT", // WIN/LOSS nahi, alag category
                     price: priceData.price,
                     mode: holdingMode,
+                    pnl: parseFloat(pnl.toFixed(2)), // actual P&L bhi store karo for reference
                   }),
                 });
 

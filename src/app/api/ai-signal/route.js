@@ -44,7 +44,13 @@ TRADING MODE: SWING
 `;
 
   const indicators = chartData?.indicators;
-  const technicalText = indicators
+  const hasValidIndicators =
+    indicators &&
+    indicators.rsi !== null &&
+    indicators.rsi !== undefined &&
+    indicators.macd?.value !== null;
+
+  const technicalText = hasValidIndicators
     ? `
 TECHNICAL ANALYSIS:
 Trend: ${indicators.trend} (${indicators.trendStrength} over 20 days)
@@ -80,8 +86,11 @@ Win Rate: ${memory.winRate ?? "N/A"}% (${memory.completedSignals || 0} completed
 Recent Outcomes: ${
         memory.signalHistory
           ?.filter((s) => s.outcome !== "PENDING")
-          .slice(-3)
-          .map((s) => `${s.signal}@₹${s.price}→${s.outcome}`)
+          .slice(-5)
+          .map(
+            (s) =>
+              `${s.signal}@₹${s.price}→${s.outcome}${s.outcome === "FORCED_EXIT" ? "(time-based)" : ""}`,
+          )
           .join(", ") || "No completed signals yet"
       }
 

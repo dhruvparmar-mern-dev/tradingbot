@@ -31,10 +31,19 @@ export async function POST(request) {
   const actionableSignals = history.filter(
     (s) => s.signal === "BUY" || s.signal === "SELL",
   );
-  const completed = actionableSignals.filter((s) => s.outcome !== "PENDING");
+
+  // const completed = actionableSignals.filter((s) => s.outcome !== "PENDING");
+  const completed = actionableSignals.filter(
+    (s) => s.outcome === "WIN" || s.outcome === "LOSS", // FORCED_EXIT exclude!
+  );
   const wins = completed.filter((s) => s.outcome === "WIN").length;
   const winRate =
     completed.length > 0 ? ((wins / completed.length) * 100).toFixed(0) : null;
+
+  // Alag track karo forced exits:
+  const forcedExits = actionableSignals.filter(
+    (s) => s.outcome === "FORCED_EXIT",
+  );
 
   await Stock.findOneAndUpdate(
     { symbol },

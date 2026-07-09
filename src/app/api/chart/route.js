@@ -108,6 +108,13 @@ export async function GET(request) {
 
 function calculateRSI(closes, period = 14) {
   const validCloses = closes.filter(Boolean);
+  if (validCloses.length < 15) {
+    console.warn(
+      `Not enough candles for RSI: ${validCloses.length} candles for ${symbol}`,
+    );
+    return null;
+  }
+
   if (validCloses.length < period + 1) return null;
 
   let gains = 0,

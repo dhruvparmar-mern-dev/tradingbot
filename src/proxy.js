@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 // import jwt from "jsonwebtoken";
 
-export async function middleware(request) {
+export async function proxy(request) {
   const token = request.cookies.get("auth_token")?.value;
   const isLoginPage = request.nextUrl.pathname === "/login";
   const isAuthApi = request.nextUrl.pathname.startsWith("/api/auth");
