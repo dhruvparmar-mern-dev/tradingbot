@@ -73,24 +73,14 @@ export async function POST(request) {
         { status: 400 },
       );
     }
-    // if (quantity > holding.quantity)
-    //   return NextResponse.json({ error: "oversell" }, { status: 400 });
-
-    if (holding.quantity === 0) {
-      await Portfolio.deleteOne({ symbol, mode: tradeMode });
-    }
 
     const pnl = (price - holding.avgPrice) * quantity;
     let updatedHolding = null;
 
-    if (holding.quantity === quantity) {
-      await Portfolio.deleteOne({ symbol });
+    if (holding.quantity === 0) {
+      await Portfolio.deleteOne({ symbol, mode: tradeMode });
     } else {
-      updatedHolding = await Portfolio.findOneAndUpdate(
-        { symbol },
-        { quantity: holding.quantity - quantity },
-        { new: true },
-      );
+      updatedHolding = holding;
     }
 
     const trade = await Trade.create({
@@ -100,7 +90,7 @@ export async function POST(request) {
       price,
       total,
       pnl,
-      mode: mode || holding.mode || "swing",
+      mode: tradeMode,
     });
 
     const updatedUser = await User.findOneAndUpdate(

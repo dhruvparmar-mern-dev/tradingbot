@@ -3,6 +3,7 @@ import kite from "@/lib/kite";
 import { connectDB } from "@/lib/mongoose";
 import KiteSession from "@/models/KiteSession";
 import { getNSEInstruments } from "@/lib/kiteInstruments";
+import { computeIndicators } from "@/lib/indicators";
 
 export async function GET(request) {
   await connectDB();
@@ -90,6 +91,13 @@ export async function GET(request) {
       );
     }
 
+    const indicators = computeIndicators({
+      closes: data.map((c) => c.close),
+      highs: data.map((c) => c.high),
+      lows: data.map((c) => c.low),
+      volumes: data.map((c) => c.volume),
+    });
+
     return NextResponse.json({
       candles: data.map((c) => ({
         date: new Date(c.date).toLocaleString("en-IN", {
@@ -101,6 +109,7 @@ export async function GET(request) {
         close: c.close,
         volume: c.volume,
       })),
+      indicators,
       mode,
       interval,
     });

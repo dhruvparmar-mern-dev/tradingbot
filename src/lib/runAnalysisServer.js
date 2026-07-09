@@ -5,9 +5,13 @@ export async function runAnalysisServerSide(
   stock,
   tradingMode,
   forceFreshChart = false,
+  cookieHeader = "",
 ) {
+  const authHeaders = { Cookie: cookieHeader };
+
   const memoryRes = await fetch(
     `${BASE_URL}/api/memory?symbol=${stock.symbol}&mode=${tradingMode}`,
+    { headers: authHeaders },
   );
   const memoryData = await memoryRes.json();
   const hasMemory = memoryData && memoryData.lastAnalysis;
@@ -25,9 +29,13 @@ export async function runAnalysisServerSide(
   }
 
   const fetchPromises = [
-    fetch(`${BASE_URL}/api/news?symbol=${stock.symbol}`),
-    fetch(`${BASE_URL}/api/market-context?symbol=${stock.symbol}`),
-    ...(needsChart ? [fetch(chartEndpoint)] : []),
+    fetch(`${BASE_URL}/api/news?symbol=${stock.symbol}`, {
+      headers: authHeaders,
+    }),
+    fetch(`${BASE_URL}/api/market-context?symbol=${stock.symbol}`, {
+      headers: authHeaders,
+    }),
+    ...(needsChart ? [fetch(chartEndpoint, { headers: authHeaders })] : []),
   ];
   const responses = await Promise.all(fetchPromises);
   const newsData = await responses[0].json();
@@ -36,7 +44,7 @@ export async function runAnalysisServerSide(
 
   const aiRes = await fetch(`${BASE_URL}/api/ai-signal`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders },
     body: JSON.stringify({
       stockData: stock,
       news: newsData,
@@ -81,7 +89,7 @@ export async function runAnalysisServerSide(
     };
     await fetch(`${BASE_URL}/api/memory`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders },
       body: JSON.stringify({
         symbol: stock.symbol,
         memory: newMemory,

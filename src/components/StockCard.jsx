@@ -56,21 +56,23 @@ export default function StockCard({ stock }) {
   const analyzeStock = async () => {
     setLoading(true);
     try {
-      // const existingMemory = await useTradingStore
-      //   .getState()
-      //   .getMemory(stock.symbol, tradingMode);
+      const existingMemory = await useTradingStore
+        .getState()
+        .getMemory(stock.symbol, tradingMode);
 
-      // const lastAnalysisAge = existingMemory?.lastAnalysis?.date
-      //   ? (Date.now() - new Date(existingMemory.lastAnalysis.date).getTime()) /
-      //     (1000 * 60 * 60) // hours
-      //   : Infinity;
+      const lastAnalysisAgeMinutes = existingMemory?.lastAnalysis?.date
+        ? (Date.now() - new Date(existingMemory.lastAnalysis.date).getTime()) /
+          (1000 * 60)
+        : Infinity;
 
-      // const needsFreshChart =
-      //   tradingMode === "intraday" ||
-      //   !existingMemory?.lastAnalysis ||
-      //   lastAnalysisAge > 4;
+      // Intraday candles are 5-minute bars — no point refetching within that
+      // window. Swing uses daily candles, so a few hours' staleness is fine.
+      const staleAfterMinutes = tradingMode === "intraday" ? 5 : 4 * 60;
+      const needsFreshChart =
+        !existingMemory?.lastAnalysis ||
+        lastAnalysisAgeMinutes > staleAfterMinutes;
 
-      const result = await runAnalysis(stock, tradingMode, true);
+      const result = await runAnalysis(stock, tradingMode, needsFreshChart);
       setSignal(result);
       setNews(result.news || []);
 

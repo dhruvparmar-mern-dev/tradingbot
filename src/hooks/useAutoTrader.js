@@ -120,7 +120,7 @@ export default function useAutoTrader() {
             // const memory = await memRes.json();
             const memory = await useTradingStore
               .getState()
-              .getMemory(stock.symbol, tradingMode);
+              .getMemory(holding.symbol, holdingMode);
 
             if (!memory?.lastAnalysis) continue;
 
@@ -292,10 +292,7 @@ export default function useAutoTrader() {
             }
           }
           if (tradingMode === "intraday") {
-            const now = new Date();
-            const hours = now.getHours();
-            const minutes = now.getMinutes();
-            const isForceExitTime = hours === 15 && minutes >= 15;
+            const isForceExitTime = timeInMinutes >= marketClose;
 
             if (isForceExitTime) {
               const currentPortfolio = useTradingStore.getState().portfolio;
@@ -313,11 +310,9 @@ export default function useAutoTrader() {
                   priceData.price,
                 );
 
-                // Force-exit wale block mein:
                 const pnl =
                   (priceData.price - holding.avgPrice) * holding.quantity;
-                // Outcome determine karo — profit tha ya loss?
-                // const outcome = pnl >= 0 ? "WIN" : "LOSS";
+                const outcome = pnl >= 0 ? "WIN" : "LOSS";
 
                 await fetch("/api/outcome", {
                   method: "POST",

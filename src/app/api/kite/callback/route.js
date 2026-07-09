@@ -20,7 +20,7 @@ export async function GET(request) {
     console.log("Session generated:", session.access_token ? "yes" : "no");
 
     await connectDB();
-    await KiteSession.findOneAndUpdate(
+    const saved = await KiteSession.findOneAndUpdate(
       { userId: "default" },
       {
         accessToken: session.access_token,

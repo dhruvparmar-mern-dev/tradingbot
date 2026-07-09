@@ -11,6 +11,7 @@ export async function POST(request) {
   }
 
   await connectDB();
+  const cookieHeader = request.headers.get("cookie") || "";
 
   const results = [];
   for (const symbol of symbols) {
@@ -30,6 +31,7 @@ export async function POST(request) {
         { symbol, name: stockData.name || symbol, price: stockData.price },
         mode,
         true, // hamesha fresh chart bulk-scan mein
+        cookieHeader,
       );
 
       results.push({ symbol, ...analysis });

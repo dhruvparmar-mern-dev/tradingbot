@@ -6,6 +6,7 @@ import TradeLog from "./TradeLog";
 import { toast } from "sonner";
 import MarketOverview from "./MarketOverview";
 import AIPicks from "./AIPicks";
+import MarketScan from "./MarketScan";
 import ReportModal from "./ReportModal";
 
 export default function Dashboard() {
@@ -106,6 +107,7 @@ export default function Dashboard() {
       <div className="max-w-6xl mx-auto px-6 py-6 flex flex-col gap-6">
         <MarketOverview />
         <AIPicks />
+        <MarketScan />
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[

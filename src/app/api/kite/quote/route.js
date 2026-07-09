@@ -60,8 +60,10 @@ export async function GET(request) {
       open,
       prevClose,
       volume: data.volume_traded || data.volume || 0,
-      fiftyTwoWeekHigh: data.upper_circuit_limit || null,
-      fiftyTwoWeekLow: data.lower_circuit_limit || null,
+      // Kite's quote API doesn't return 52-week range — upper/lower_circuit_limit
+      // are daily circuit bands, not the 52-week high/low, so don't conflate them.
+      fiftyTwoWeekHigh: null,
+      fiftyTwoWeekLow: null,
     });
   } catch (err) {
     console.error("Kite quote error:", err.message);

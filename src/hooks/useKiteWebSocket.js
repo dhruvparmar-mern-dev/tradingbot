@@ -207,14 +207,12 @@ export default function useKiteWebSocket() {
       const holding = portfolio.find((p) => p.symbol === tick.symbol);
       if (!holding) continue;
 
+      const holdingMode = holding.mode || tradingMode;
+
       try {
-        // const memRes = await fetch(
-        //   `/api/memory?symbol=${tick.symbol}&mode=${tradingMode}`,
-        // );
-        // const memory = await memRes.json();
         const memory = await useTradingStore
           .getState()
-          .getMemory(stock.symbol, tradingMode);
+          .getMemory(tick.symbol, holdingMode);
         if (!memory?.lastAnalysis) continue;
 
         const { stopLoss, target } = memory.lastAnalysis;
@@ -228,7 +226,7 @@ export default function useKiteWebSocket() {
               symbol: holding.symbol,
               outcome: "WIN",
               price: tick.price,
-              mode: tradingMode,
+              mode: holdingMode,
             }),
           });
           toast.success(
@@ -243,7 +241,7 @@ export default function useKiteWebSocket() {
               symbol: holding.symbol,
               outcome: "LOSS",
               price: tick.price,
-              mode: tradingMode,
+              mode: holdingMode,
             }),
           });
           toast.error(
