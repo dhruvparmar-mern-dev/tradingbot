@@ -36,6 +36,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# scratch/analysis output — not code, don't track
+backtest-*.json
+logs/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

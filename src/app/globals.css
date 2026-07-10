@@ -139,3 +139,12 @@ body {
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
+
+/* Scrollable content without a visible scrollbar (Firefox + WebKit) */
+.scrollbar-ghost {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-ghost::-webkit-scrollbar {
+  display: none;
+}

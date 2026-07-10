@@ -8,6 +8,11 @@ const PRICING = {
   "claude-sonnet-5": { input: 2.0, output: 10.0 },
 };
 
+// Single source of truth for the timezone used to format any date embedded
+// in the prompt — the audit log below reads this same constant, so it can
+// never drift out of sync with what's actually sent to the model.
+const PROMPT_TIMEZONE = "Asia/Kolkata";
+
 function estimateCost(model, usage) {
   const rate = PRICING[model];
   if (!rate || !usage) return null;
@@ -142,7 +147,7 @@ YOUR MEMORY OF ${stockData.symbol}:
 Character: ${memory.character}
 Known Behavior: ${memory.behavior}
 Key Levels: Support ₹${memory.keyLevels?.support} | Resistance ₹${memory.keyLevels?.resistance}
-Last Signal: ${memory.lastAnalysis?.signal} on ${new Date(memory.lastAnalysis?.date).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })} at ₹${memory.lastAnalysis?.price || "unknown"}
+Last Signal: ${memory.lastAnalysis?.signal} on ${new Date(memory.lastAnalysis?.date).toLocaleDateString("en-IN", { timeZone: PROMPT_TIMEZONE })} at ₹${memory.lastAnalysis?.price || "unknown"}
 Past Signals: ${memory.signalHistory?.length || 0} signals recorded
 Win Rate: ${memory.winRate ?? "N/A"}% (${memory.completedSignals || 0} completed out of ${memory.totalSignals || 0} total signals)
 Recent Outcomes: ${
@@ -261,6 +266,8 @@ Respond in this exact JSON format only, no extra text:
       inputTokens: data.usage?.input_tokens,
       outputTokens: data.usage?.output_tokens,
       costUSD: cost,
+      prompt,
+      rawResponseText: JSON.stringify(data),
     });
     return NextResponse.json(
       { error: data.error?.message || "AI analysis failed" },
@@ -280,10 +287,24 @@ Respond in this exact JSON format only, no extra text:
       inputTokens: data.usage?.input_tokens,
       outputTokens: data.usage?.output_tokens,
       costUSD: cost,
+      prompt,
+      rawResponseText: text,
+      parsedResponse: parsed,
     });
     return NextResponse.json(parsed);
   } catch (err) {
     console.error("JSON parse error:", clean);
+    await AiUsage.create({
+      symbol: stockData.symbol,
+      mode: tradingMode,
+      signal: null,
+      model,
+      inputTokens: data.usage?.input_tokens,
+      outputTokens: data.usage?.output_tokens,
+      costUSD: cost,
+      prompt,
+      rawResponseText: text,
+    });
     return NextResponse.json(
       { error: "AI returned invalid response" },
       { status: 500 },

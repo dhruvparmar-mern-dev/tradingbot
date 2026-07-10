@@ -179,7 +179,7 @@ export default function Dashboard() {
           </button>
         </div>
 
-        <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit">
+        <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit max-w-full overflow-x-auto scrollbar-ghost">
           {[
             { key: "watchlist", label: `Watchlist (${watchlist.length})` },
             { key: "portfolio", label: `Portfolio (${portfolio.length})` },
@@ -189,7 +189,7 @@ export default function Dashboard() {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
                 activeTab === tab.key
                   ? "bg-zinc-700 text-white"
                   : "text-zinc-400 hover:text-white"
