@@ -39,6 +39,7 @@ yarn-error.log*
 # scratch/analysis output — not code, don't track
 backtest-*.json
 logs/
+/data/
 
 # typescript
 *.tsbuildinfo
