@@ -134,19 +134,22 @@ function findSwingLevels(highs, lows, currentPrice, lookback = 40, strength = 2)
     if (lows[i] === Math.min(...lowWindow)) swingLows.push(lows[i]);
   }
 
-  const resistanceCandidates = swingHighs.filter((h) => h >= currentPrice);
-  const supportCandidates = swingLows.filter((l) => l <= currentPrice);
+  // Strict inequality — a level exactly AT the current price (common for
+  // flat/illiquid stocks whose recent candles haven't moved at all) isn't a
+  // real support/resistance zone, it's just noise that happens to match.
+  const resistanceCandidates = swingHighs.filter((h) => h > currentPrice);
+  const supportCandidates = swingLows.filter((l) => l < currentPrice);
 
+  // Don't fall back to the nearest swing high/low regardless of side — right
+  // after a gap, every recent swing point can sit on the wrong side of the
+  // current price (e.g. all swing highs still below price after a gap-up),
+  // and handing one back as "resistance" while it's actually below price is
+  // actively misleading. Return null and let the caller use an ATR-based
+  // fallback anchored to the current price instead.
   const resistance = resistanceCandidates.length
     ? Math.min(...resistanceCandidates)
-    : swingHighs.length
-      ? Math.max(...swingHighs)
-      : null;
-  const support = supportCandidates.length
-    ? Math.max(...supportCandidates)
-    : swingLows.length
-      ? Math.min(...swingLows)
-      : null;
+    : null;
+  const support = supportCandidates.length ? Math.max(...supportCandidates) : null;
 
   return { support, resistance };
 }
@@ -187,13 +190,28 @@ export function computeIndicators({ closes, highs, lows, volumes }) {
       ? findSwingLevels(highs, lows, currentPrice)
       : { support: null, resistance: null };
 
+  // Fallback order: a confirmed nearby swing level > an ATR-scaled band
+  // around the current price (handles the post-gap case where every recent
+  // swing point is stale) > a flat lookback min/max as a last resort (only
+  // hit if ATR itself isn't available yet, e.g. a very new listing).
   const last20Highs = highs.slice(-20).filter(Boolean);
   const last20Lows = lows.slice(-20).filter(Boolean);
+  const atrFallbackMultiple = 2;
+  const atrResistance =
+    atr != null && currentPrice != null
+      ? currentPrice + atrFallbackMultiple * atr
+      : null;
+  const atrSupport =
+    atr != null && currentPrice != null
+      ? currentPrice - atrFallbackMultiple * atr
+      : null;
   const resistanceValue =
     swingLevels.resistance ??
+    atrResistance ??
     (last20Highs.length ? Math.max(...last20Highs) : null);
   const supportValue =
     swingLevels.support ??
+    atrSupport ??
     (last20Lows.length ? Math.min(...last20Lows) : null);
   const resistance = resistanceValue != null ? resistanceValue.toFixed(2) : null;
   const support = supportValue != null ? supportValue.toFixed(2) : null;
