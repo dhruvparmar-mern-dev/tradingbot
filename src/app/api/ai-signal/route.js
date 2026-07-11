@@ -4,6 +4,10 @@ import AiUsage from "@/models/AiUsage";
 import { getUser } from "@/lib/auth";
 
 // Sonnet 5 intro pricing runs through 2026-08-31 — update to $3 / $15 after that.
+// (Prompt caching was tried and reverted — our static system content is
+// ~250-300 tokens, well under Anthropic's ~1024-token minimum for a
+// cacheable block on Sonnet-class models, so cache_control was silently
+// ignored. Not worth inflating the prompt just to cross that floor.)
 const PRICING = {
   "claude-sonnet-5": { input: 2.0, output: 10.0 },
 };
@@ -115,6 +119,11 @@ RSI (14): ${indicators.rsi} ${indicators.rsi > 70 ? "⚠️ Overbought" : indica
 MACD: ${indicators.macd.value} | Signal: ${indicators.macd.signal} | Histogram: ${indicators.macd.histogram}
 MACD Crossover: ${indicators.macd.crossover}
 ATR (14): ₹${indicators.atr ?? "N/A"} — use this to size stop-loss/target (see trading mode rules below), not a fixed %
+${
+  indicators.volume
+    ? `Volume: ${Number(indicators.volume.today).toLocaleString("en-IN")} vs ${Number(indicators.volume.avg20Day).toLocaleString("en-IN")} avg (20-period) — ${indicators.volume.ratio}x, ${indicators.volume.signal}`
+    : ""
+}
 ${
   indicators.vwap
     ? `VWAP (today): ₹${indicators.vwap} — price is currently ${stockData.price >= indicators.vwap ? "ABOVE" : "BELOW"} VWAP (${stockData.price >= indicators.vwap ? "bullish" : "bearish"} intraday bias)${
