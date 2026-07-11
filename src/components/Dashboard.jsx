@@ -104,9 +104,15 @@ export default function Dashboard() {
       // this racing with the 30s poll for the *same* symbol.
       for (const r of buySignals) {
         try {
-          await attemptAutoBuy({ symbol: r.symbol, price: r.lastAnalysis?.price });
+          await attemptAutoBuy({
+            symbol: r.symbol,
+            price: r.lastAnalysis?.price,
+          });
         } catch (err) {
-          console.error(`Immediate auto-buy attempt failed for ${r.symbol}:`, err);
+          console.error(
+            `Immediate auto-buy attempt failed for ${r.symbol}:`,
+            err,
+          );
         }
       }
     } catch (err) {
@@ -123,7 +129,6 @@ export default function Dashboard() {
       <div className="max-w-6xl mx-auto px-6 py-6 flex flex-col gap-6">
         <MarketOverview />
         <AIPicks />
-        <MarketScan />
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
@@ -199,6 +204,7 @@ export default function Dashboard() {
             { key: "watchlist", label: `Watchlist (${watchlist.length})` },
             { key: "portfolio", label: `Portfolio (${portfolio.length})` },
             { key: "trades", label: `Trades (${tradeLog.length})` },
+            { key: "movers", label: "Today's Top Movers" },
             { key: "aiUsage", label: "AI Usage" },
           ].map((tab) => (
             <button
@@ -260,6 +266,8 @@ export default function Dashboard() {
           ))}
 
         {!loadingPrices && activeTab === "aiUsage" && <AiUsageTab />}
+
+        {!loadingPrices && activeTab === "movers" && <MarketScan />}
 
         {showReport && (
           <ReportModal report={report} onClose={() => setShowReport(false)} />

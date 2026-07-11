@@ -8,7 +8,7 @@ import Link from "next/link";
 export default function MarketScan() {
   const { tradingMode } = useTradingStore();
   const [scanning, setScanning] = useState(false);
-  const [picks, setPicks] = useState(null);
+  const [movers, setMovers] = useState(null);
   const [meta, setMeta] = useState(null);
 
   const scanMarket = async () => {
@@ -22,11 +22,9 @@ export default function MarketScan() {
       const data = await res.json();
       if (data.error) return toast.error(data.error);
 
-      setPicks(data.picks.filter((p) => p.signal === "BUY"));
+      setMovers(data.movers);
       setMeta({ scanned: data.scannedCount, candidates: data.candidateCount });
-      toast.success(
-        `Scanned ${data.scannedCount} stocks — ${data.candidateCount} passed the filter`,
-      );
+      toast.success(`Scanned ${data.scannedCount} stocks — no AI spent yet`);
     } catch (err) {
       toast.error("Market scan failed");
     } finally {
@@ -40,7 +38,7 @@ export default function MarketScan() {
         <div className="flex items-center gap-2">
           <Radar className="w-4 h-4 text-purple-400" />
           <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-            Market Scan ({tradingMode})
+            Today&apos;s Top Movers
           </h2>
         </div>
         <button
@@ -52,47 +50,45 @@ export default function MarketScan() {
         </button>
       </div>
 
-      {picks === null && (
+      {movers === null && (
         <p className="text-xs text-zinc-500">
-          Scans the full NSE list for today&apos;s top movers, then runs AI
-          analysis on the top {15}.
+          Numeric filter only — no AI involved, zero cost. Scans the full NSE
+          list for today&apos;s biggest movers still near their day&apos;s high.
+          This is NOT an AI recommendation — a stock showing up here has
+          already moved, so it may well be a HOLD or even overextended. Click
+          into any stock to run AI analysis yourself if it looks interesting.
         </p>
       )}
 
-      {picks?.length === 0 && (
+      {movers?.length === 0 && (
         <p className="text-xs text-zinc-500">
-          No BUY signals from today&apos;s scan ({meta?.candidates} stocks passed
-          the numeric filter out of {meta?.scanned} scanned).
+          No stocks passed today&apos;s numeric filter ({meta?.candidates} of{" "}
+          {meta?.scanned} scanned).
         </p>
       )}
 
-      {picks?.length > 0 && (
+      {movers?.length > 0 && (
         <div className="flex flex-col gap-2">
-          {picks.map((pick) => (
+          {movers.map((m) => (
             <Link
-              key={pick.symbol}
-              href={`/stock/${pick.symbol}`}
+              key={m.symbol}
+              href={`/stock/${m.symbol}`}
               className="flex items-center justify-between bg-zinc-800/50 hover:bg-zinc-800 rounded-lg px-3 py-2.5 transition-colors"
             >
-              <div className="flex items-center gap-3 min-w-0">
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 shrink-0">
-                  BUY
-                </span>
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-white truncate">
-                    {pick.symbol?.replace(".NS", "")}
-                  </div>
-                  <div className="text-xs text-zinc-500 truncate max-w-55">
-                    {pick.reason}
-                  </div>
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-white truncate">
+                  {m.symbol?.replace(".NS", "")}
+                </div>
+                <div className="text-xs text-zinc-500 truncate">
+                  {m.name}
                 </div>
               </div>
               <div className="flex items-center gap-3 shrink-0">
                 <span className="text-xs text-emerald-400 tabular-nums">
-                  +{pick.changePercent}%
+                  +{m.changePercent}%
                 </span>
-                <span className="text-xs text-zinc-400">
-                  {pick.confidence}/10
+                <span className="text-xs text-zinc-500 tabular-nums">
+                  ₹{m.price}
                 </span>
               </div>
             </Link>

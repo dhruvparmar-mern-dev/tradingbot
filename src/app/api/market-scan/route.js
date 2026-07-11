@@ -3,7 +3,6 @@ import kite from "@/lib/kite";
 import { connectDB } from "@/lib/mongoose";
 import KiteSession from "@/models/KiteSession";
 import { getNSEInstruments } from "@/lib/kiteInstruments";
-import { runAnalysisServerSide } from "@/lib/runAnalysisServer";
 
 export const maxDuration = 60;
 
@@ -17,10 +16,18 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// This is a numeric today's-top-movers filter only — no AI involved, zero
+// cost. It deliberately does NOT run AI analysis on the results anymore: the
+// old version auto-analyzed every shortlist entry, which meant burning an AI
+// call on stocks that had, by definition, already moved up the most today —
+// often exactly the ones where AI correctly says HOLD (extended, no more
+// room to run). That made this feel like an "AI recommends" feature when it
+// was really just a top-gainers list. Now it just returns the numeric
+// shortlist; the user picks which ones (if any) are worth spending an AI
+// call on via the "Analyze with AI" button on that stock's own page.
 export async function POST(request) {
   const { mode } = await request.json();
   const tradingMode = mode || "swing";
-  const cookieHeader = request.headers.get("cookie") || "";
 
   await connectDB();
   const session = await KiteSession.findOne({ userId: "default" });
@@ -85,36 +92,10 @@ export async function POST(request) {
   candidates.sort((a, b) => b.score - a.score);
   const shortlist = candidates.slice(0, SHORTLIST_SIZE);
 
-  // Stage 2 — full AI analysis, only on the shortlist. Run in parallel to stay
-  // well under the serverless function time limit.
-  const picks = await Promise.all(
-    shortlist.map(async (candidate) => {
-      try {
-        const analysis = await runAnalysisServerSide(
-          {
-            symbol: candidate.symbol,
-            name: candidate.name,
-            price: candidate.price,
-          },
-          tradingMode,
-          true,
-          cookieHeader,
-        );
-        return { ...candidate, ...analysis };
-      } catch (err) {
-        console.error(
-          `Market scan AI analysis failed for ${candidate.symbol}:`,
-          err.message,
-        );
-        return { ...candidate, error: err.message };
-      }
-    }),
-  );
-
   return NextResponse.json({
     scannedCount: instruments.length,
     candidateCount: candidates.length,
-    picks: picks.sort((a, b) => (b.confidence || 0) - (a.confidence || 0)),
+    movers: shortlist,
     mode: tradingMode,
   });
 }
