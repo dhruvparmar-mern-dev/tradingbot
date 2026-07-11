@@ -9,6 +9,7 @@ import AIPicks from "./AIPicks";
 import MarketScan from "./MarketScan";
 import ReportModal from "./ReportModal";
 import AiUsageTab from "./AiUsageTab";
+import { attemptAutoBuy } from "@/lib/attemptAutoBuy";
 
 export default function Dashboard() {
   const [search, setSearch] = useState("");
@@ -89,11 +90,25 @@ export default function Dashboard() {
       });
       const { results } = await res.json();
 
-      const buyCount = results.filter((r) => r.signal === "BUY").length;
-      toast.success(`Scan complete! ${buyCount} BUY signals found.`);
+      const buySignals = results.filter((r) => r.signal === "BUY");
+      toast.success(`Scan complete! ${buySignals.length} BUY signals found.`);
 
       // Memory cache clear karo, taaki StockCard fresh data dikhaye
       useTradingStore.setState({ memoryCache: {} });
+
+      // Auto-trade is on -> act on fresh BUY signals right away instead of
+      // waiting up to 30s for the next useAutoTrader poll tick. Sequential,
+      // not parallel — keeps balance/quantity checks (which read live store
+      // state) from racing each other across different symbols in the same
+      // scan. The atomic claim inside attemptAutoBuy still protects against
+      // this racing with the 30s poll for the *same* symbol.
+      for (const r of buySignals) {
+        try {
+          await attemptAutoBuy({ symbol: r.symbol, price: r.lastAnalysis?.price });
+        } catch (err) {
+          console.error(`Immediate auto-buy attempt failed for ${r.symbol}:`, err);
+        }
+      }
     } catch (err) {
       console.error(err);
 

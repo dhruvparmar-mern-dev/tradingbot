@@ -12,6 +12,7 @@ import {
 import { ExternalLink, Newspaper, RefreshCw, X } from "lucide-react";
 import { ScrollArea } from "./ui/scroll-area";
 import { runAnalysis } from "@/lib/runAnalysis";
+import { attemptAutoBuy } from "@/lib/attemptAutoBuy";
 
 export default function StockCard({ stock }) {
   const [loading, setLoading] = useState(false);
@@ -75,6 +76,19 @@ export default function StockCard({ stock }) {
       const result = await runAnalysis(stock, tradingMode, needsFreshChart);
       setSignal(result);
       setNews(result.news || []);
+
+      // If auto-trade is on and this is a fresh qualifying BUY, act on it
+      // right away instead of waiting up to 30s for the next useAutoTrader
+      // poll tick. Fire-and-forget so a failed auto-buy attempt doesn't
+      // surface as an "analysis failed" error to the user.
+      if (result.signal === "BUY") {
+        attemptAutoBuy({
+          symbol: stock.symbol,
+          price: result.lastAnalysis?.price ?? stock.price,
+        }).catch((err) =>
+          console.error(`Immediate auto-buy attempt failed for ${stock.symbol}:`, err),
+        );
+      }
 
       // const memRes = await fetch(
       //   `/api/memory?symbol=${stock.symbol}&mode=${tradingMode}`,

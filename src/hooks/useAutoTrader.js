@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
 import useTradingStore from "@/store/tradingStore";
 import { toast } from "sonner";
-import { runAnalysis as reanalyzeStock, runAnalysis } from "@/lib/runAnalysis";
+import { runAnalysis } from "@/lib/runAnalysis";
+import { attemptAutoBuy } from "@/lib/attemptAutoBuy";
 
 export default function useAutoTrader() {
   const intervalRef = useRef(null);
@@ -32,15 +33,8 @@ export default function useAutoTrader() {
       isRunningRef.current = true;
 
       try {
-        const {
-          watchlist,
-          autoTrade,
-          minConfidence,
-          maxPerTrade,
-          buyStock,
-          sellStock,
-          tradingMode,
-        } = useTradingStore.getState();
+        const { watchlist, autoTrade, sellStock, tradingMode } =
+          useTradingStore.getState();
 
         if (!watchlist.length) return;
 
@@ -180,131 +174,19 @@ export default function useAutoTrader() {
           }
         }
 
-        // Auto buy if enabled
+        // Auto buy if enabled — this is the fallback path. It re-checks every
+        // signal on a timer so it still catches: (a) signals generated while
+        // the market was closed (they're already stale by the time the
+        // market opens, so the reanalysis branch inside attemptAutoBuy
+        // re-verifies before acting), and (b) anything the immediate
+        // post-analysis trigger (see StockCard.jsx) missed or lost the claim
+        // race on.
         if (autoTrade) {
           for (const stock of watchlist) {
-            const alreadyHolding = useTradingStore
-              .getState()
-              .portfolio.find((p) => p.symbol === stock.symbol);
-            if (alreadyHolding) continue;
-
+            const priceData = validPrices.find((p) => p.symbol === stock.symbol);
+            if (!priceData) continue;
             try {
-              const priceData = validPrices.find(
-                (p) => p.symbol === stock.symbol,
-              ); // ← move here, uncommented
-              if (!priceData) continue;
-
-              // const memRes = await fetch(
-              //   `/api/memory?symbol=${stock.symbol}&mode=${tradingMode}`,
-              // );
-              // const memory = await memRes.json();
-
-              const memory = await useTradingStore
-                .getState()
-                .getMemory(stock.symbol, tradingMode);
-              if (!memory?.lastAnalysis) continue;
-
-              const { signal, confidence } = memory.lastAnalysis;
-              if (signal !== "BUY" || confidence < minConfidence) continue;
-              if (memory.lastAnalysis.acted) continue;
-
-              const signalAge =
-                (Date.now() - new Date(memory.lastAnalysis.date).getTime()) /
-                (1000 * 60);
-              const maxAgeMinutes = tradingMode === "intraday" ? 15 : 240;
-              const priceMoveSinceSignal = priceData
-                ? Math.abs(
-                    (priceData.price - memory.lastAnalysis.price) /
-                      memory.lastAnalysis.price,
-                  ) * 100
-                : 0;
-
-              const needsReanalysis =
-                signalAge > maxAgeMinutes || priceMoveSinceSignal > 1.5;
-
-              if (needsReanalysis) {
-                const msg = `Re-analyzing ${stock.symbol} — stale (${signalAge.toFixed(0)}min) or moved (${priceMoveSinceSignal.toFixed(2)}%)`;
-                console.log(msg);
-                toast.info(msg);
-
-                try {
-                  const freshSignal = await reanalyzeStock(
-                    stock,
-                    tradingMode,
-                    true,
-                  );
-                  if (
-                    !freshSignal ||
-                    freshSignal.signal !== "BUY" ||
-                    freshSignal.confidence < minConfidence
-                  ) {
-                    continue; // AI changed its mind or confidence dropped, skip this cycle
-                  }
-                  // Use the fresh signal's data going forward for this buy decision
-                  memory.lastAnalysis = freshSignal.lastAnalysis; // updated reference
-                } catch (err) {
-                  console.error("Re-analysis failed:", err);
-                  toast.error("Re-analysis failed");
-                  continue; // fail safe — don't buy on uncertain data
-                }
-              }
-
-              // const priceData = validPrices.find(
-              //   (p) => p.symbol === stock.symbol,
-              // );
-              // if (!priceData) continue;
-
-              // maxPerTrade is a spend cap (never buy more ₹ than this), but a
-              // wide stop-loss on a volatile stock could still mean losing
-              // most of that ₹ in one trade. Also cap the ACTUAL loss if
-              // stopped out to a fraction of maxPerTrade, so quantity shrinks
-              // for volatile stocks with far-away stops, not just cheap ones.
-              const MAX_RISK_FRACTION_OF_TRADE = 0.2;
-              const budgetBasedQty = Math.floor(maxPerTrade / priceData.price);
-              const stopLoss = memory.lastAnalysis.stopLoss;
-              const stopLossDistance = stopLoss
-                ? Math.abs(priceData.price - stopLoss)
-                : null;
-              const riskBasedQty = stopLossDistance
-                ? Math.floor(
-                    (maxPerTrade * MAX_RISK_FRACTION_OF_TRADE) /
-                      stopLossDistance,
-                  )
-                : budgetBasedQty;
-
-              const quantity = Math.min(budgetBasedQty, riskBasedQty);
-              if (quantity < 1) continue;
-
-              const { balance } = useTradingStore.getState();
-              if (balance < priceData.price) continue;
-
-              await buyStock(
-                { ...stock, price: priceData.price },
-                quantity,
-                priceData.price,
-              );
-
-              // Mark signal as acted so it doesn't buy again
-              await fetch("/api/memory", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  symbol: stock.symbol,
-                  memory: {
-                    ...memory,
-                    lastAnalysis: {
-                      ...memory.lastAnalysis,
-                      acted: true,
-                      actedAt: new Date(),
-                    },
-                  },
-                  mode: useTradingStore.getState().tradingMode,
-                }),
-              });
-
-              toast.success(
-                `🤖 Auto bought ${quantity} × ${stock.symbol?.replace(".NS", "")} at ₹${priceData.price}`,
-              );
+              await attemptAutoBuy(stock, { livePrice: priceData.price });
             } catch (err) {
               console.error("Auto buy error:", err);
             }
