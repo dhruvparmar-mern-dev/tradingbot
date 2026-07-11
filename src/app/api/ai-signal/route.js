@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import Anthropic from "@anthropic-ai/sdk";
 import { connectDB } from "@/lib/mongoose";
 import AiUsage from "@/models/AiUsage";
 import { getUser } from "@/lib/auth";
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_KEY });
 
 // Sonnet 5 intro pricing runs through 2026-08-31 — update to $3 / $15 after that.
 // (Prompt caching was tried and reverted — our static system content is
@@ -247,43 +250,52 @@ Respond in this exact JSON format only, no extra text:
 }
 `;
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": process.env.ANTHROPIC_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-5",
+  const model = "claude-sonnet-5";
+  let message;
+  try {
+    message = await anthropic.messages.create({
+      model,
       max_tokens: 1000,
       thinking: { type: "disabled" },
       messages: [{ role: "user", content: prompt }],
-    }),
-  });
-
-  const data = await res.json();
-  const model = "claude-sonnet-5";
-  const cost = estimateCost(model, data.usage);
-
-  if (!data.content || !data.content[0]) {
+    });
+  } catch (err) {
+    // SDK throws on non-2xx (APIError) instead of returning an error body,
+    // so there's no usage/cost data to log for this failure path.
     await AiUsage.create({
       symbol: stockData.symbol,
       mode: tradingMode,
       signal: null,
       model,
-      inputTokens: data.usage?.input_tokens,
-      outputTokens: data.usage?.output_tokens,
-      costUSD: cost,
       prompt,
-      rawResponseText: JSON.stringify(data),
+      rawResponseText: JSON.stringify({ error: err.message, status: err.status }),
     });
     return NextResponse.json(
-      { error: data.error?.message || "AI analysis failed" },
+      { error: err.message || "AI analysis failed" },
+      { status: err.status || 500 },
+    );
+  }
+
+  const cost = estimateCost(model, message.usage);
+
+  if (!message.content || !message.content[0]) {
+    await AiUsage.create({
+      symbol: stockData.symbol,
+      mode: tradingMode,
+      signal: null,
+      model,
+      inputTokens: message.usage?.input_tokens,
+      outputTokens: message.usage?.output_tokens,
+      costUSD: cost,
+      prompt,
+      rawResponseText: JSON.stringify(message),
+    });
+    return NextResponse.json(
+      { error: "AI analysis failed" },
       { status: 500 },
     );
   }
-  const text = data.content[0].text;
+  const text = message.content[0].text;
   const clean = text.replace(/```json|```/g, "").trim();
 
   try {
@@ -293,8 +305,8 @@ Respond in this exact JSON format only, no extra text:
       mode: tradingMode,
       signal: parsed.signal,
       model,
-      inputTokens: data.usage?.input_tokens,
-      outputTokens: data.usage?.output_tokens,
+      inputTokens: message.usage?.input_tokens,
+      outputTokens: message.usage?.output_tokens,
       costUSD: cost,
       prompt,
       rawResponseText: text,
@@ -308,8 +320,8 @@ Respond in this exact JSON format only, no extra text:
       mode: tradingMode,
       signal: null,
       model,
-      inputTokens: data.usage?.input_tokens,
-      outputTokens: data.usage?.output_tokens,
+      inputTokens: message.usage?.input_tokens,
+      outputTokens: message.usage?.output_tokens,
       costUSD: cost,
       prompt,
       rawResponseText: text,
