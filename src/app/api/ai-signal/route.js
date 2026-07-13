@@ -95,7 +95,7 @@ Rules:
 TRADING MODE: INTRADAY
 - Position must be closed by 3:15 PM IST today
 - Stop loss should be approximately 0.75x-1x ATR from entry (use the ATR value given below — this scales to how much THIS stock actually moves, not a fixed %)
-- Target should be approximately 1.5x-2x ATR from entry, and must still clear at least a 1% move (see minimum target rule below)
+- Target should be AT LEAST 1.5x-2x ATR from entry, and must still clear at least a 1% move (see minimum target rule below) — this is a floor, not a ceiling. If the stock is showing strong breakout momentum (high volume, strong trend, already-expanding range), size the target to the realistic move potential — don't cap it at 1.5x-2x ATR just because that's the baseline.
 - High volume confirmation is mandatory for intraday
 - Avoid entry after 2:00 PM IST
 - Risk-reward ratio should be at least 1:1.5 (target distance should exceed stop-loss distance by 50%)
@@ -104,7 +104,7 @@ TRADING MODE: INTRADAY
 TRADING MODE: SWING
 - Can hold position for 2-5 days
 - Stop loss should be approximately 1.5x-2x ATR from entry (use the ATR value given below)
-- Target should be approximately 3x-4x ATR from entry
+- Target should be AT LEAST 3x-4x ATR from entry — this is a floor, not a ceiling. A stock in a strong confirmed trend can be sized for a bigger realistic move.
 - Volume less critical than trend
 `;
 
@@ -304,6 +304,20 @@ Respond in this exact JSON format only, no extra text:
 
   try {
     const parsed = JSON.parse(clean);
+
+    // The prompt tells the model to enforce a 1% minimum target, but it
+    // doesn't always do the arithmetic itself (seen live: TECHM got a BUY
+    // with a target only 0.45% above entry). This is a floor check only —
+    // it never touches or caps a target that's already >= 1%, so a stock
+    // with real momentum can still get a much bigger target from the model.
+    if (parsed.signal === "BUY" && typeof parsed.target === "number") {
+      const gapPct = ((parsed.target - stockData.price) / stockData.price) * 100;
+      if (gapPct < 1) {
+        parsed.signal = "HOLD";
+        parsed.reason = `[Auto-overridden BUY→HOLD: target was only ${gapPct.toFixed(2)}% above entry, below the 1% minimum] ${parsed.reason}`;
+      }
+    }
+
     await AiUsage.create({
       symbol: stockData.symbol,
       mode: tradingMode,
