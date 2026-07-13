@@ -36,6 +36,7 @@ export async function POST(request) {
   await connectDB();
   const sessionUser = await getUser();
   const dailyBudget = sessionUser?.dailyAiBudgetUSD ?? 1.0;
+  const costAwarenessEnabled = sessionUser?.costAwarenessEnabled ?? false;
 
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
@@ -94,7 +95,7 @@ Rules:
 TRADING MODE: INTRADAY
 - Position must be closed by 3:15 PM IST today
 - Stop loss should be approximately 0.75x-1x ATR from entry (use the ATR value given below — this scales to how much THIS stock actually moves, not a fixed %)
-- Target should be approximately 1.5x-2x ATR from entry, and must still clear at least a 1% move (see cost awareness below)
+- Target should be approximately 1.5x-2x ATR from entry, and must still clear at least a 1% move (see minimum target rule below)
 - High volume confirmation is mandatory for intraday
 - Avoid entry after 2:00 PM IST
 - Risk-reward ratio should be at least 1:1.5 (target distance should exceed stop-loss distance by 50%)
@@ -141,11 +142,14 @@ Resistance: ₹${indicators.resistance}
 `
     : "No technical data available";
 
+  const feeExplanationText = costAwarenessEnabled
+    ? `Every round-trip trade (buy + sell) costs approximately ₹50-60 in brokerage, STT, and other charges, regardless of trade size. `
+    : "";
+
   const costAwarenessText = `
-TRANSACTION COST AWARENESS:
-- Every round-trip trade (buy + sell) costs approximately ₹50-60 in brokerage, STT, and other charges, regardless of trade size.
-- For a trade to be genuinely profitable after costs, the target must represent AT LEAST a 1% move from entry price (1.5% preferred for higher confidence).
-- Do NOT suggest BUY signals where the target is less than 1% above entry price — such trades are not worth taking even if technically valid, since transaction costs will exceed the profit.
+MINIMUM TARGET RULE:
+- ${feeExplanationText}For a trade to be genuinely worth taking, the target must represent AT LEAST a 1% move from entry price (1.5% preferred for higher confidence).
+- Do NOT suggest BUY signals where the target is less than 1% above entry price — such trades are not worth taking even if technically valid.
 - If technicals only support a sub-1% move, signal should be HOLD instead of BUY, regardless of other positive factors.
 `;
 

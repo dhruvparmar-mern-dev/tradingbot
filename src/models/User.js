@@ -8,6 +8,7 @@ const UserSchema = new mongoose.Schema({
   maxPerTrade: { type: Number, default: 10000 },
   tradingMode: { type: String, default: "swing" },
   dailyAiBudgetUSD: { type: Number, default: 1.0 },
+  costAwarenessEnabled: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
 });
 
