@@ -17,20 +17,31 @@ export default function AppShell({ children }) {
     const kiteRes = await fetch("/api/kite/status");
     const { connected: kiteConnected } = await kiteRes.json();
 
-    const updated = await Promise.all(
-      stocks.map(async (s) => {
-        try {
-          const endpoint = kiteConnected
-            ? `/api/kite/quote?symbol=${s.symbol}`
-            : `/api/stock?symbol=${s.symbol}`;
-          const res = await fetch(endpoint);
-          const data = await res.json();
-          return { ...s, ...data };
-        } catch {
-          return s;
-        }
-      }),
-    );
+    let updated;
+    if (kiteConnected) {
+      // One batched Kite call for the whole list instead of one request per
+      // stock (was firing N concurrent single-symbol requests on page load).
+      try {
+        const symbols = stocks.map((s) => s.symbol).join(",");
+        const res = await fetch(`/api/kite/quote?symbols=${encodeURIComponent(symbols)}`);
+        const dataMap = await res.json();
+        updated = stocks.map((s) => (dataMap[s.symbol] ? { ...s, ...dataMap[s.symbol] } : s));
+      } catch {
+        updated = stocks;
+      }
+    } else {
+      updated = await Promise.all(
+        stocks.map(async (s) => {
+          try {
+            const res = await fetch(`/api/stock?symbol=${s.symbol}`);
+            const data = await res.json();
+            return { ...s, ...data };
+          } catch {
+            return s;
+          }
+        }),
+      );
+    }
     if (type === "watchlist") useTradingStore.setState({ watchlist: updated });
     if (type === "portfolio") useTradingStore.setState({ portfolio: updated });
     return updated;
