@@ -25,6 +25,20 @@ export default function StockCard({ stock }) {
 
   const holding = portfolio.find((p) => p.symbol === stock.symbol);
 
+  const handleBuyClick = () => {
+    if (signal?.signal === "BUY" && signal.target != null) {
+      const gapRupees = signal.target - stock.price;
+      const gapPct = (gapRupees / stock.price) * 100;
+      if (gapPct < 1) {
+        const proceed = window.confirm(
+          `Target is only ₹${gapRupees.toFixed(2)} away (${gapPct.toFixed(2)}%) — below the recommended 1% minimum move. Buy anyway?`,
+        );
+        if (!proceed) return;
+      }
+    }
+    buyStock(stock, quantity, stock.price);
+  };
+
   useEffect(() => {
     loadExistingSignal();
   }, [tradingMode]);
@@ -195,7 +209,7 @@ export default function StockCard({ stock }) {
             className="w-14 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-white text-sm text-center tabular-nums focus:outline-none focus:border-zinc-500"
           />
           <button
-            onClick={() => buyStock(stock, quantity, stock.price)}
+            onClick={handleBuyClick}
             className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-3.5 py-1.5 rounded-lg transition-colors"
           >
             Buy
