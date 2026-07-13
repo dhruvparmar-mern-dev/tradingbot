@@ -5,6 +5,9 @@ const StockSchema = new mongoose.Schema({
   name: String,
   exchange: String,
   addedAt: { type: Date, default: Date.now },
+  // Leaving the watchlist archives the document instead of deleting it, so
+  // memory/signalHistory survives if the stock is ever re-added later.
+  inWatchlist: { type: Boolean, default: true },
   memorySwing: {
     character: String,
     keyLevels: {

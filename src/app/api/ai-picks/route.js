@@ -10,6 +10,7 @@ export async function GET(request) {
 
   const stocks = await Stock.find({
     [`${field}.lastAnalysis.signal`]: "BUY",
+    inWatchlist: { $ne: false },
   });
 
   const picks = stocks
