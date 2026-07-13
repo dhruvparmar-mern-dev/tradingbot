@@ -94,7 +94,7 @@ Rules:
       ? `
 TRADING MODE: INTRADAY
 - Position must be closed by 3:15 PM IST today
-- Stop loss should be approximately 0.75x-1x ATR from entry (use the ATR value given below — this scales to how much THIS stock actually moves, not a fixed %)
+- Stop loss should be AT LEAST 0.75x-1x ATR from entry (use the ATR value given below) — this is a baseline, not a rigid range. Place the stop where the trade thesis is genuinely invalidated (beyond a real support level, or beyond how much this stock is actually swinging today) — if that's wider than 0.75x-1x ATR, use the wider stop. A stop tighter than the stock's real noise gets tagged by ordinary wobble, not a real reversal.
 - Target should be AT LEAST 1.5x-2x ATR from entry, and must still clear at least a 1% move (see minimum target rule below) — this is a floor, not a ceiling. If the stock is showing strong breakout momentum (high volume, strong trend, already-expanding range), size the target to the realistic move potential — don't cap it at 1.5x-2x ATR just because that's the baseline.
 - High volume confirmation is mandatory for intraday
 - Avoid entry after 2:00 PM IST
@@ -103,7 +103,7 @@ TRADING MODE: INTRADAY
       : `
 TRADING MODE: SWING
 - Can hold position for 2-5 days
-- Stop loss should be approximately 1.5x-2x ATR from entry (use the ATR value given below)
+- Stop loss should be AT LEAST 1.5x-2x ATR from entry (use the ATR value given below) — this is a baseline, not a rigid range. Place it where the trade thesis is genuinely invalidated (a real support break), even if that's wider than 1.5x-2x ATR.
 - Target should be AT LEAST 3x-4x ATR from entry — this is a floor, not a ceiling. A stock in a strong confirmed trend can be sized for a bigger realistic move.
 - Volume less critical than trend
 `;
