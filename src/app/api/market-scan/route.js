@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import kite from "@/lib/kite";
 import { connectDB } from "@/lib/mongoose";
 import KiteSession from "@/models/KiteSession";
+import MoverLog from "@/models/MoverLog";
 import { getNSEInstruments } from "@/lib/kiteInstruments";
 
 export const maxDuration = 60;
@@ -92,10 +93,71 @@ export async function POST(request) {
   candidates.sort((a, b) => b.score - a.score);
   const shortlist = candidates.slice(0, SHORTLIST_SIZE);
 
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); // YYYY-MM-DD
+  await Promise.all(
+    shortlist.map(async (m) => {
+      const existing = await MoverLog.findOne({ symbol: m.symbol, date: today });
+      if (existing) {
+        await MoverLog.updateOne(
+          { _id: existing._id },
+          {
+            $inc: { timesSeenToday: 1 },
+            $set: { lastSeenAt: new Date() },
+            $max: { bestChangePercent: m.changePercent, bestScore: m.score },
+          },
+        );
+      } else {
+        await MoverLog.create({
+          symbol: m.symbol,
+          name: m.name,
+          date: today,
+          bestChangePercent: m.changePercent,
+          bestScore: m.score,
+        });
+      }
+    }),
+  );
+
   return NextResponse.json({
     scannedCount: instruments.length,
     candidateCount: candidates.length,
     movers: shortlist,
     mode: tradingMode,
+  });
+}
+
+const REPEAT_MIN_DAYS = 2;
+
+// "All-time top movers" — stocks that have shown up in the numeric shortlist
+// on multiple distinct days, not just once. A repeat appearance is a much
+// stronger signal than a single day's move (which is often just noise).
+export async function GET() {
+  await connectDB();
+  const repeats = await MoverLog.aggregate([
+    {
+      $group: {
+        _id: "$symbol",
+        name: { $first: "$name" },
+        daysAppeared: { $sum: 1 },
+        totalTimesSeen: { $sum: "$timesSeenToday" },
+        bestChangePercent: { $max: "$bestChangePercent" },
+        lastSeenAt: { $max: "$lastSeenAt" },
+        dates: { $push: "$date" },
+      },
+    },
+    { $match: { daysAppeared: { $gte: REPEAT_MIN_DAYS } } },
+    { $sort: { daysAppeared: -1, lastSeenAt: -1 } },
+  ]);
+
+  return NextResponse.json({
+    repeatMovers: repeats.map((r) => ({
+      symbol: r._id,
+      name: r.name,
+      daysAppeared: r.daysAppeared,
+      totalTimesSeen: r.totalTimesSeen,
+      bestChangePercent: r.bestChangePercent,
+      lastSeenAt: r.lastSeenAt,
+      dates: r.dates.sort(),
+    })),
   });
 }
