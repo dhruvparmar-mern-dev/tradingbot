@@ -168,15 +168,20 @@ export async function GET(request) {
       sectorSymbol ? fetchQuote(sectorSymbol) : Promise.resolve(null),
     ]);
 
-    // Market sentiment
+    // Market sentiment. Threshold widened from 0.5% -- NIFTY's ordinary daily
+    // noise routinely crosses +/-0.5%, so that bar was labeling normal flat
+    // days as BEARISH/BULLISH and triggering the AI prompt's market-context
+    // caution rule on days with no real risk-on/risk-off signal (confirmed
+    // live 2026-07-14: NIFTY sat at -0.55% to -0.59% most of the day, an
+    // ordinary drift, but was labeled BEARISH and cited in nearly every HOLD).
     let marketSentiment = "NEUTRAL";
-    if (nifty?.change > 0.5) marketSentiment = "BULLISH";
-    else if (nifty?.change < -0.5) marketSentiment = "BEARISH";
+    if (nifty?.change > 1.0) marketSentiment = "BULLISH";
+    else if (nifty?.change < -1.0) marketSentiment = "BEARISH";
 
     // Sector sentiment
     let sectorSentiment = "NEUTRAL";
-    if (sectorData?.change > 0.5) sectorSentiment = "BULLISH";
-    else if (sectorData?.change < -0.5) sectorSentiment = "BEARISH";
+    if (sectorData?.change > 1.0) sectorSentiment = "BULLISH";
+    else if (sectorData?.change < -1.0) sectorSentiment = "BEARISH";
 
     return NextResponse.json({
       nifty: {
