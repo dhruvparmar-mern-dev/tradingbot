@@ -292,8 +292,10 @@ Respond in this exact JSON format only, no extra text:
   try {
     message = await anthropic.messages.create({
       model,
-      max_tokens: 1000,
-      thinking: { type: "disabled" },
+      // Thinking blocks share this budget with the JSON response, so this is
+      // higher than the old disabled-thinking 1000 to leave room for both.
+      max_tokens: 2000,
+      thinking: { type: "adaptive" },
       messages: [{ role: "user", content: prompt }],
     });
   } catch (err) {
@@ -315,7 +317,11 @@ Respond in this exact JSON format only, no extra text:
 
   const cost = estimateCost(model, message.usage);
 
-  if (!message.content || !message.content[0]) {
+  // With thinking enabled, content[0] can be a "thinking" block instead of
+  // the text block — find the text block explicitly rather than assuming
+  // it's first.
+  const textBlock = message.content?.find((b) => b.type === "text");
+  if (!textBlock) {
     await AiUsage.create({
       symbol: stockData.symbol,
       mode: tradingMode,
@@ -332,7 +338,7 @@ Respond in this exact JSON format only, no extra text:
       { status: 500 },
     );
   }
-  const text = message.content[0].text;
+  const text = textBlock.text;
   const clean = text.replace(/```json|```/g, "").trim();
 
   try {
