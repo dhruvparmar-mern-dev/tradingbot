@@ -82,7 +82,7 @@ Sector (${marketContext.sector?.name}): ${marketContext.sector?.change >= 0 ? "�
 Overall Market: ${marketContext.marketSentiment}
 
 Rules:
-- If NIFTY is BEARISH, avoid BUY signals unless stock is very strong
+- If NIFTY is BEARISH, avoid BUY signals unless the stock is "very strong" -- defined concretely as: HIGH or VERY_HIGH volume confirmation, MACD and trend both aligned with the direction (not conflicting), and the target already clears the 1% floor. A stock meeting all three should not be vetoed just because NIFTY is down. Note BEARISH here can mean NIFTY is down as little as 0.5% -- a mild, ordinary down day, not a selloff -- so don't treat it as a strong signal on its own.
 - If NIFTY is BULLISH, BUY signals are more reliable
 - If sector is BEARISH but stock is up, it may be short lived
 - If sector is BULLISH and stock is up, strong confirmation
@@ -223,6 +223,7 @@ ${costAwarenessText}
 
 RULES FOR DECISION MAKING:
 - Your signal must come from technical analysis: RSI, MACD, trend, support/resistance, volume confirmation.
+- RSI above 70 alone is NOT a reason to avoid a BUY -- a genuinely trending stock can stay overbought for a while. Only treat it as an exhaustion warning when it comes WITH other real evidence: MACD histogram already shrinking from a peak, price failing to make new highs on the most recent candles, or volume fading despite continued price rise. If volume/trend/MACD are all still confirming the move, high RSI reflects strength, not automatic exhaustion.
 - Market context (NIFTY/sector) is SECONDARY — use it only to:
   (a) avoid trades during a clearly bearish broad market, or
   (b) add minor confidence when technicals and market context align.
@@ -267,6 +268,7 @@ ${costAwarenessText}
 
 RULES FOR DECISION MAKING:
 - Your signal must come from technical analysis: RSI, MACD, trend, support/resistance, volume confirmation.
+- RSI above 70 alone is NOT a reason to avoid a BUY -- a genuinely trending stock can stay overbought for a while. Only treat it as an exhaustion warning when it comes WITH other real evidence: MACD histogram already shrinking from a peak, price failing to make new highs on the most recent candles, or volume fading despite continued price rise. If volume/trend/MACD are all still confirming the move, high RSI reflects strength, not automatic exhaustion.
 - Market context (NIFTY/sector) is SECONDARY — use it only to:
   (a) avoid trades during a clearly bearish broad market, or
   (b) add minor confidence when technicals and market context align.
