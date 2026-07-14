@@ -292,9 +292,10 @@ Respond in this exact JSON format only, no extra text:
   try {
     message = await anthropic.messages.create({
       model,
-      // Thinking blocks share this budget with the JSON response, so this is
-      // higher than the old disabled-thinking 1000 to leave room for both.
-      max_tokens: 2000,
+      // Thinking blocks share this budget with the JSON response. 2000 was
+      // still not enough -- a real call (SBIN, 2026-07-14) hit the ceiling
+      // mid-JSON and lost the whole signal (unparseable, silent HOLD-null).
+      max_tokens: 4000,
       thinking: { type: "adaptive" },
       messages: [{ role: "user", content: prompt }],
     });
