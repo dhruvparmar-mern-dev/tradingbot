@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/mongoose";
 import KiteSession from "@/models/KiteSession";
 import MoverLog from "@/models/MoverLog";
 import { getNSEInstruments } from "@/lib/kiteInstruments";
+import { computeIndicators, calculateVWAP } from "@/lib/indicators";
 
 export const maxDuration = 60;
 
@@ -92,6 +93,59 @@ export async function POST(request) {
 
   candidates.sort((a, b) => b.score - a.score);
   const shortlist = candidates.slice(0, SHORTLIST_SIZE);
+
+  // Stage 2 — for just the shortlist (not the whole market), check each
+  // against the same "very strong" bar the AI prompt now uses: HIGH/
+  // VERY_HIGH volume, trend+MACD both bullish, and a target that clears the
+  // 1% floor. This is the free, deterministic pre-filter behind "Bot's
+  // Pick" -- it doesn't spend AI budget, it just tells the user which of
+  // today's movers are worth spending an AI call on.
+  const fromDate = new Date();
+  fromDate.setDate(fromDate.getDate() - 5);
+  for (const m of shortlist) {
+    const inst = instruments.find((i) => `${i.tradingsymbol}.NS` === m.symbol);
+    if (!inst) continue;
+    try {
+      const candles = await kite.getHistoricalData(inst.instrument_token, "5minute", fromDate, new Date());
+      if (!candles.length) continue;
+      const closes = candles.map((c) => c.close).filter(Boolean).sort((a, b) => a - b);
+      const median = closes[Math.floor(closes.length / 2)];
+      const clean = candles.filter((c) => !(c.high > median * 3 || c.low < median / 3));
+      const ind = computeIndicators({
+        closes: clean.map((c) => c.close),
+        highs: clean.map((c) => c.high),
+        lows: clean.map((c) => c.low),
+        volumes: clean.map((c) => c.volume),
+      });
+      const todayStr = new Date(clean.at(-1).date).toDateString();
+      const todaysCandles = clean.filter((c) => new Date(c.date).toDateString() === todayStr);
+      const vwap = calculateVWAP(
+        todaysCandles.map((c) => c.high), todaysCandles.map((c) => c.low),
+        todaysCandles.map((c) => c.close), todaysCandles.map((c) => c.volume),
+      );
+
+      const atr = parseFloat(ind.atr);
+      const targetPct = atr ? ((2 * atr) / m.price) * 100 : 0;
+      const volumeStrong = ind.volume.signal === "HIGH" || ind.volume.signal === "VERY_HIGH";
+      const trendUp = ind.trend === "UPTREND";
+      const macdBullish = ind.macd.crossover === "BULLISH";
+      const clearsFloor = targetPct >= 1;
+
+      m.indicators = { rsi: ind.rsi, trend: ind.trend, macdCrossover: ind.macd.crossover, volumeSignal: ind.volume.signal, volumeRatio: ind.volume.ratio, atr: ind.atr, vwap: vwap?.toFixed(2) ?? null };
+      m.actionable = volumeStrong && trendUp && macdBullish && clearsFloor;
+      m.actionableReason = m.actionable
+        ? `${ind.volume.signal} volume (${ind.volume.ratio}x), uptrend + bullish MACD aligned, target clears 1% (~${targetPct.toFixed(2)}%)`
+        : [
+            !volumeStrong && `volume only ${ind.volume.signal} (${ind.volume.ratio}x)`,
+            !trendUp && "not in uptrend",
+            !macdBullish && "MACD not bullish",
+            !clearsFloor && `target only ~${targetPct.toFixed(2)}%, under 1%`,
+          ].filter(Boolean).join("; ");
+    } catch (err) {
+      console.error(`Actionable check failed for ${m.symbol}:`, err.message);
+    }
+    await sleep(300);
+  }
 
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); // YYYY-MM-DD
   await Promise.all(

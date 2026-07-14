@@ -2,9 +2,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import useTradingStore from "@/store/tradingStore";
 import { toast } from "sonner";
-import { Radar, TrendingUp } from "lucide-react";
+import { Radar, TrendingUp, Target } from "lucide-react";
 import Link from "next/link";
 import { isMarketOpenNow } from "@/lib/attemptAutoBuy";
+import SectorOverview from "./SectorOverview";
 
 const AUTO_SCAN_INTERVAL_MS = 10 * 60 * 1000; // 10 min — full-market scan, no need for tighter
 
@@ -71,6 +72,7 @@ export default function MarketScan() {
 
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+      <SectorOverview />
       <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <Radar className="w-4 h-4 text-purple-400" />
@@ -107,6 +109,44 @@ export default function MarketScan() {
           into any stock to run AI analysis yourself if it looks interesting.
           Auto-scan only runs while this tab is open in your browser.
         </p>
+      )}
+
+      {movers?.some((m) => m.actionable) && (
+        <div className="mb-4 rounded-xl border border-emerald-700/50 bg-emerald-500/10 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Target className="w-4 h-4 text-emerald-400" />
+            <h3 className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">
+              Bot&apos;s Pick — worth a look today
+            </h3>
+          </div>
+          <p className="text-[11px] text-zinc-400 mb-3">
+            Free numeric check only (no AI spent) — volume, trend, and MACD
+            all aligned, and the target clears the 1% cost floor. Click through
+            and run AI analysis yourself for the full reasoning before buying.
+          </p>
+          <div className="flex flex-col gap-2">
+            {movers.filter((m) => m.actionable).map((m) => (
+              <Link
+                key={m.symbol}
+                href={`/stock/${m.symbol}`}
+                className="flex items-center justify-between bg-zinc-900/60 hover:bg-zinc-900 rounded-lg px-3 py-2.5 transition-colors"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-white truncate">
+                    {m.symbol?.replace(".NS", "")}{" "}
+                    <span className="text-emerald-400">+{m.changePercent}%</span>
+                  </div>
+                  <div className="text-[11px] text-zinc-500 truncate">
+                    {m.actionableReason}
+                  </div>
+                </div>
+                <span className="text-xs text-zinc-500 tabular-nums shrink-0 ml-3">
+                  ₹{m.price}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
       )}
 
       {movers?.length === 0 && (
