@@ -142,6 +142,37 @@ Resistance: ₹${indicators.resistance}
 `
     : "No technical data available";
 
+  // Indicators are a reliable numeric summary, but they don't tell the model
+  // WHEN today's move happened (a spike-then-fade reads very differently
+  // than a steady grind, even with identical end-of-day RSI/MACD). Give it
+  // the last few candles' actual shape instead of the full raw series —
+  // enough for shape/timing context without ballooning token cost or
+  // drowning the model in a long raw-number table it won't reliably parse.
+  const RECENT_CANDLE_COUNT = 10;
+  const candles = chartData?.candles;
+  const nowText = new Date().toLocaleString("en-IN", {
+    timeZone: PROMPT_TIMEZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "short",
+  });
+  const recentPriceActionText =
+    candles && candles.length > 0
+      ? (() => {
+          const recent = candles.slice(-RECENT_CANDLE_COUNT);
+          const span = tradingMode === "intraday" ? "5-min candles" : "daily candles";
+          const lines = recent
+            .map((c) => `${c.date}: ₹${c.open}→₹${c.close} (H ₹${c.high} / L ₹${c.low})`)
+            .join("\n");
+          return `
+RECENT PRICE ACTION:
+Current time: ${nowText} IST. Below: last ${recent.length} ${span} (${recent[0].date} to ${recent.at(-1).date}).
+${lines}
+`;
+        })()
+      : "";
+
   const feeExplanationText = costAwarenessEnabled
     ? `Every round-trip trade (buy + sell) costs approximately ₹50-60 in brokerage, STT, and other charges, regardless of trade size. `
     : "";
@@ -182,6 +213,7 @@ Price: ₹${stockData.price} (${stockData.change?.toFixed(2)}% change)
 High: ₹${stockData.high} | Low: ₹${stockData.low}
 Volume: ${stockData.volume?.toLocaleString()}
 ${technicalText}
+${recentPriceActionText}
 
 ${marketText}
 
@@ -225,6 +257,7 @@ High: ₹${stockData.high} | Low: ₹${stockData.low}
 Volume: ${stockData.volume?.toLocaleString()}
 
 ${technicalText}
+${recentPriceActionText}
 
 ${marketText}
 
