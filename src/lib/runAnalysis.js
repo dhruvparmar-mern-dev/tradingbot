@@ -78,6 +78,7 @@ export async function runAnalysis(stock, tradingMode, forceFreshChart = false) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         symbol: stock.symbol,
+        name: stock.name,
         memory: newMemory,
         mode: tradingMode,
       }),

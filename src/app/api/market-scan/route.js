@@ -3,6 +3,7 @@ import kite from "@/lib/kite";
 import { connectDB } from "@/lib/mongoose";
 import KiteSession from "@/models/KiteSession";
 import MoverLog from "@/models/MoverLog";
+import MarketScanSnapshot from "@/models/MarketScanSnapshot";
 import { getNSEInstruments } from "@/lib/kiteInstruments";
 import { computeIndicators, calculateVWAP } from "@/lib/indicators";
 
@@ -172,6 +173,18 @@ export async function POST(request) {
     }),
   );
 
+  await MarketScanSnapshot.findOneAndUpdate(
+    { key: "latest" },
+    {
+      movers: shortlist,
+      scannedCount: instruments.length,
+      candidateCount: candidates.length,
+      mode: tradingMode,
+      updatedAt: new Date(),
+    },
+    { upsert: true },
+  );
+
   return NextResponse.json({
     scannedCount: instruments.length,
     candidateCount: candidates.length,
@@ -187,6 +200,7 @@ const REPEAT_MIN_DAYS = 2;
 // stronger signal than a single day's move (which is often just noise).
 export async function GET() {
   await connectDB();
+  const snapshot = await MarketScanSnapshot.findOne({ key: "latest" }).lean();
   const repeats = await MoverLog.aggregate([
     {
       $group: {
@@ -213,5 +227,14 @@ export async function GET() {
       lastSeenAt: r.lastSeenAt,
       dates: r.dates.sort(),
     })),
+    latestSnapshot: snapshot
+      ? {
+          movers: snapshot.movers,
+          scannedCount: snapshot.scannedCount,
+          candidateCount: snapshot.candidateCount,
+          mode: snapshot.mode,
+          updatedAt: snapshot.updatedAt,
+        }
+      : null,
   });
 }

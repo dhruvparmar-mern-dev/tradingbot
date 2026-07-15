@@ -9,25 +9,96 @@ import SectorOverview from "./SectorOverview";
 
 const AUTO_SCAN_INTERVAL_MS = 10 * 60 * 1000; // 10 min — full-market scan, no need for tighter
 
+function MoverActions({ m, inWatchlist, analyzing, quickResult, onAdd, onAnalyze }) {
+  const signalColor =
+    quickResult?.signal === "BUY"
+      ? "text-emerald-400"
+      : quickResult?.signal === "SELL"
+        ? "text-red-400"
+        : "text-amber-400";
+  return (
+    <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.preventDefault()}>
+      {quickResult && (
+        <span className={`text-[11px] font-medium ${signalColor}`}>
+          {quickResult.signal} {quickResult.confidence}/10
+        </span>
+      )}
+      <button
+        onClick={() => onAnalyze(m)}
+        disabled={analyzing === m.symbol}
+        title="Run AI analysis"
+        className="text-xs text-blue-400 hover:text-blue-300 disabled:opacity-50 px-2 py-1 rounded-md hover:bg-blue-500/10 transition-colors"
+      >
+        {analyzing === m.symbol ? "Analyzing…" : "Analyze"}
+      </button>
+      <button
+        onClick={() => onAdd(m)}
+        disabled={inWatchlist}
+        title={inWatchlist ? "Already in watchlist" : "Add to watchlist"}
+        className="text-xs text-purple-400 hover:text-purple-300 disabled:opacity-40 disabled:cursor-not-allowed px-2 py-1 rounded-md hover:bg-purple-500/10 transition-colors"
+      >
+        {inWatchlist ? "In watchlist" : "+ Watchlist"}
+      </button>
+    </div>
+  );
+}
+
 export default function MarketScan() {
-  const { tradingMode } = useTradingStore();
+  const { tradingMode, watchlist, addToWatchlist } = useTradingStore();
   const [scanning, setScanning] = useState(false);
   const [movers, setMovers] = useState(null);
   const [meta, setMeta] = useState(null);
   const [repeatMovers, setRepeatMovers] = useState(null);
   const [autoScan, setAutoScan] = useState(true);
+  const [analyzing, setAnalyzing] = useState(null); // symbol currently being analyzed
+  const [quickResults, setQuickResults] = useState({}); // symbol -> {signal, confidence}
   const tradingModeRef = useRef(tradingMode);
   useEffect(() => {
     tradingModeRef.current = tradingMode;
   }, [tradingMode]);
+
+  const watchlistSymbols = new Set(watchlist.map((s) => s.symbol));
 
   const loadRepeatMovers = async () => {
     try {
       const res = await fetch("/api/market-scan");
       const data = await res.json();
       setRepeatMovers(data.repeatMovers || []);
+      // Hydrate from the last scan's snapshot so a tab revisit shows
+      // something immediately instead of blank until the next auto-scan.
+      if (data.latestSnapshot && movers === null) {
+        setMovers(data.latestSnapshot.movers || []);
+        setMeta({
+          scanned: data.latestSnapshot.scannedCount,
+          candidates: data.latestSnapshot.candidateCount,
+        });
+      }
     } catch (err) {
       console.error("Failed to load repeat movers:", err);
+    }
+  };
+
+  const handleAddToWatchlist = async (m) => {
+    await addToWatchlist({ symbol: m.symbol, name: m.name, exchange: "NSE" });
+    toast.success(`${m.symbol.replace(".NS", "")} added to watchlist`);
+  };
+
+  const handleQuickAnalyze = async (m) => {
+    setAnalyzing(m.symbol);
+    try {
+      const { runAnalysis } = await import("@/lib/runAnalysis");
+      const result = await runAnalysis(m, tradingModeRef.current, true);
+      setQuickResults((prev) => ({
+        ...prev,
+        [m.symbol]: { signal: result.signal, confidence: result.confidence },
+      }));
+      toast.success(
+        `${m.symbol.replace(".NS", "")}: ${result.signal} (confidence ${result.confidence}/10)`,
+      );
+    } catch (err) {
+      toast.error(err.message || "Analysis failed");
+    } finally {
+      setAnalyzing(null);
     }
   };
 
@@ -126,12 +197,11 @@ export default function MarketScan() {
           </p>
           <div className="flex flex-col gap-2">
             {movers.filter((m) => m.actionable).map((m) => (
-              <Link
+              <div
                 key={m.symbol}
-                href={`/stock/${m.symbol}`}
-                className="flex items-center justify-between bg-zinc-900/60 hover:bg-zinc-900 rounded-lg px-3 py-2.5 transition-colors"
+                className="flex items-center justify-between bg-zinc-900/60 hover:bg-zinc-900 rounded-lg px-3 py-2.5 transition-colors gap-3"
               >
-                <div className="min-w-0">
+                <Link href={`/stock/${m.symbol}`} className="min-w-0 flex-1">
                   <div className="text-sm font-medium text-white truncate">
                     {m.symbol?.replace(".NS", "")}{" "}
                     <span className="text-emerald-400">+{m.changePercent}%</span>
@@ -139,11 +209,19 @@ export default function MarketScan() {
                   <div className="text-[11px] text-zinc-500 truncate">
                     {m.actionableReason}
                   </div>
-                </div>
-                <span className="text-xs text-zinc-500 tabular-nums shrink-0 ml-3">
+                </Link>
+                <span className="text-xs text-zinc-500 tabular-nums shrink-0">
                   ₹{m.price}
                 </span>
-              </Link>
+                <MoverActions
+                  m={m}
+                  inWatchlist={watchlistSymbols.has(m.symbol)}
+                  analyzing={analyzing}
+                  quickResult={quickResults[m.symbol]}
+                  onAdd={handleAddToWatchlist}
+                  onAnalyze={handleQuickAnalyze}
+                />
+              </div>
             ))}
           </div>
         </div>
@@ -159,28 +237,33 @@ export default function MarketScan() {
       {movers?.length > 0 && (
         <div className="flex flex-col gap-2">
           {movers.map((m) => (
-            <Link
+            <div
               key={m.symbol}
-              href={`/stock/${m.symbol}`}
-              className="flex items-center justify-between bg-zinc-800/50 hover:bg-zinc-800 rounded-lg px-3 py-2.5 transition-colors"
+              className="flex items-center justify-between bg-zinc-800/50 hover:bg-zinc-800 rounded-lg px-3 py-2.5 transition-colors gap-3"
             >
-              <div className="min-w-0">
+              <Link href={`/stock/${m.symbol}`} className="min-w-0 flex-1">
                 <div className="text-sm font-medium text-white truncate">
                   {m.symbol?.replace(".NS", "")}
                 </div>
                 <div className="text-xs text-zinc-500 truncate">
                   {m.name}
                 </div>
-              </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <span className="text-xs text-emerald-400 tabular-nums">
-                  +{m.changePercent}%
-                </span>
-                <span className="text-xs text-zinc-500 tabular-nums">
-                  ₹{m.price}
-                </span>
-              </div>
-            </Link>
+              </Link>
+              <span className="text-xs text-emerald-400 tabular-nums shrink-0">
+                +{m.changePercent}%
+              </span>
+              <span className="text-xs text-zinc-500 tabular-nums shrink-0">
+                ₹{m.price}
+              </span>
+              <MoverActions
+                m={m}
+                inWatchlist={watchlistSymbols.has(m.symbol)}
+                analyzing={analyzing}
+                quickResult={quickResults[m.symbol]}
+                onAdd={handleAddToWatchlist}
+                onAnalyze={handleQuickAnalyze}
+              />
+            </div>
           ))}
         </div>
       )}
@@ -200,28 +283,33 @@ export default function MarketScan() {
           </p>
           <div className="flex flex-col gap-2">
             {repeatMovers.map((m) => (
-              <Link
+              <div
                 key={m.symbol}
-                href={`/stock/${m.symbol}`}
-                className="flex items-center justify-between bg-zinc-800/50 hover:bg-zinc-800 rounded-lg px-3 py-2.5 transition-colors"
+                className="flex items-center justify-between bg-zinc-800/50 hover:bg-zinc-800 rounded-lg px-3 py-2.5 transition-colors gap-3"
               >
-                <div className="min-w-0">
+                <Link href={`/stock/${m.symbol}`} className="min-w-0 flex-1">
                   <div className="text-sm font-medium text-white truncate">
                     {m.symbol?.replace(".NS", "")}
                   </div>
                   <div className="text-xs text-zinc-500 truncate">
                     {m.name}
                   </div>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <span className="text-xs text-amber-400 tabular-nums">
-                    {m.daysAppeared} days
-                  </span>
-                  <span className="text-xs text-zinc-500 tabular-nums">
-                    best +{m.bestChangePercent}%
-                  </span>
-                </div>
-              </Link>
+                </Link>
+                <span className="text-xs text-amber-400 tabular-nums shrink-0">
+                  {m.daysAppeared} days
+                </span>
+                <span className="text-xs text-zinc-500 tabular-nums shrink-0">
+                  best +{m.bestChangePercent}%
+                </span>
+                <MoverActions
+                  m={m}
+                  inWatchlist={watchlistSymbols.has(m.symbol)}
+                  analyzing={analyzing}
+                  quickResult={quickResults[m.symbol]}
+                  onAdd={handleAddToWatchlist}
+                  onAnalyze={handleQuickAnalyze}
+                />
+              </div>
             ))}
           </div>
         </div>
