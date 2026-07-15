@@ -6,6 +6,7 @@ import DeepScanLog from "@/models/DeepScanLog";
 import MarketScanSnapshot from "@/models/MarketScanSnapshot";
 import { getNSEInstruments } from "@/lib/kiteInstruments";
 import { computeIndicators, calculateVWAP } from "@/lib/indicators";
+import { hasMarketOpenedToday } from "@/lib/marketHours";
 
 export const maxDuration = 60;
 
@@ -26,6 +27,16 @@ function sleep(ms) {
 // top slice -- same 2-stage funnel as market-scan, just without the
 // "must already be a mover" requirement. No AI involved, zero cost.
 export async function POST() {
+  // Same guard as market-scan -- a manual click (or a bug) before the
+  // market opens today would log Kite's stale last-traded data under
+  // today's date.
+  if (!hasMarketOpenedToday()) {
+    return NextResponse.json(
+      { error: "Market hasn't opened yet today (before 9:15 AM IST) — scanning now would log stale data under today's date." },
+      { status: 400 },
+    );
+  }
+
   await connectDB();
   const session = await KiteSession.findOne({ userId: "default" });
   if (!session?.accessToken) {
