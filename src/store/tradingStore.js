@@ -168,6 +168,31 @@ const useTradingStore = create((set, get) => ({
       }),
     });
     set({ watchlist: [...watchlist, stock] });
+
+    // AppShell's refreshPrices only runs once on mount, so a stock added
+    // afterward would otherwise show no live price until a full page
+    // reload. Fetch one quote immediately, then hand off to the WebSocket
+    // (if connected) for ongoing tick updates.
+    try {
+      const kiteRes = await fetch("/api/kite/status");
+      const { connected: kiteConnected } = await kiteRes.json();
+      const endpoint = kiteConnected
+        ? `/api/kite/quote?symbol=${stock.symbol}`
+        : `/api/stock?symbol=${stock.symbol}`;
+      const res = await fetch(endpoint);
+      const data = await res.json();
+      if (!data.error) {
+        set((state) => ({
+          watchlist: state.watchlist.map((s) =>
+            s.symbol === stock.symbol ? { ...s, ...data } : s,
+          ),
+        }));
+      }
+    } catch {
+      // best-effort -- next auto-trader poll or a reload will pick it up
+    }
+
+    get().subscribeToLiveTicks?.(stock.symbol);
   },
 
   removeFromWatchlist: async (symbol) => {

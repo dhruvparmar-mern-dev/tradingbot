@@ -254,6 +254,26 @@ export default function useKiteWebSocket() {
     }
   }, []);
 
+  // Adds one more symbol to the already-open subscription instead of
+  // tearing down and reconnecting the whole socket — used when a stock is
+  // added to the watchlist after this hook's initial connect() already ran.
+  const subscribeSymbol = useCallback(async (symbol) => {
+    if (tokenMapRef.current[symbol]) return;
+    try {
+      const r = await fetch(`/api/kite/instruments?symbol=${symbol}`);
+      const data = await r.json();
+      if (!data.token) return;
+      tokenMapRef.current[symbol] = data.token;
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        const token = Number(data.token);
+        wsRef.current.send(JSON.stringify({ a: "subscribe", v: [token] }));
+        wsRef.current.send(JSON.stringify({ a: "mode", v: ["full", [token]] }));
+      }
+    } catch (err) {
+      console.error("🔴 Failed to subscribe new symbol", symbol, err);
+    }
+  }, []);
+
   useEffect(() => {
     connect();
     return () => {
@@ -261,6 +281,12 @@ export default function useKiteWebSocket() {
       if (reconnectRef.current) clearTimeout(reconnectRef.current);
     };
   }, [connect]);
+
+  // Exposed via the store (not props) since addToWatchlist lives in
+  // tradingStore.js, outside the React tree.
+  useEffect(() => {
+    useTradingStore.setState({ subscribeToLiveTicks: subscribeSymbol });
+  }, [subscribeSymbol]);
 
   return { isConnected: isConnectedRef.current };
 }
