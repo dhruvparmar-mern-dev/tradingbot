@@ -224,6 +224,7 @@ ${costAwarenessText}
 RULES FOR DECISION MAKING:
 - Your signal must come from technical analysis: RSI, MACD, trend, support/resistance, volume confirmation.
 - RSI above 70 alone is NOT a reason to avoid a BUY -- a genuinely trending stock can stay overbought for a while. Only treat it as an exhaustion warning when it comes WITH other real evidence: MACD histogram already shrinking from a peak, price failing to make new highs on the most recent candles, or volume fading despite continued price rise. If volume/trend/MACD are all still confirming the move, high RSI reflects strength, not automatic exhaustion.
+- Before calling something a "fresh breakout," check current price against today's High given above. A genuine fresh breakout trades AT or NEAR today's high. If price has already pulled back meaningfully (~1-2%+) from today's high after a big earlier move, that's a spike that already topped and is fading -- not a fresh entry point, even if volume/MACD still look bullish from the initial spike.
 - Market context (NIFTY/sector) is SECONDARY — use it only to:
   (a) avoid trades during a clearly bearish broad market, or
   (b) add minor confidence when technicals and market context align.
@@ -269,6 +270,7 @@ ${costAwarenessText}
 RULES FOR DECISION MAKING:
 - Your signal must come from technical analysis: RSI, MACD, trend, support/resistance, volume confirmation.
 - RSI above 70 alone is NOT a reason to avoid a BUY -- a genuinely trending stock can stay overbought for a while. Only treat it as an exhaustion warning when it comes WITH other real evidence: MACD histogram already shrinking from a peak, price failing to make new highs on the most recent candles, or volume fading despite continued price rise. If volume/trend/MACD are all still confirming the move, high RSI reflects strength, not automatic exhaustion.
+- Before calling something a "fresh breakout," check current price against today's High given above. A genuine fresh breakout trades AT or NEAR today's high. If price has already pulled back meaningfully (~1-2%+) from today's high after a big earlier move, that's a spike that already topped and is fading -- not a fresh entry point, even if volume/MACD still look bullish from the initial spike.
 - Market context (NIFTY/sector) is SECONDARY — use it only to:
   (a) avoid trades during a clearly bearish broad market, or
   (b) add minor confidence when technicals and market context align.
