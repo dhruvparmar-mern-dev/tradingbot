@@ -6,6 +6,7 @@ import MoverLog from "@/models/MoverLog";
 import MarketScanSnapshot from "@/models/MarketScanSnapshot";
 import { getNSEInstruments } from "@/lib/kiteInstruments";
 import { computeIndicators, calculateVWAP } from "@/lib/indicators";
+import { hasMarketOpenedToday } from "@/lib/marketHours";
 
 export const maxDuration = 60;
 
@@ -31,6 +32,17 @@ function sleep(ms) {
 export async function POST(request) {
   const { mode } = await request.json();
   const tradingMode = mode || "swing";
+
+  // Only the client-side auto-scan timer checked market hours before -- a
+  // manual click (or a bug) could still run this and log Kite's stale
+  // last-traded data under today's date before today has actually traded
+  // (real incident: 00:12 AM IST, 15 bogus entries). Guard server-side too.
+  if (!hasMarketOpenedToday()) {
+    return NextResponse.json(
+      { error: "Market hasn't opened yet today (before 9:15 AM IST) — scanning now would log stale data under today's date." },
+      { status: 400 },
+    );
+  }
 
   await connectDB();
   const session = await KiteSession.findOne({ userId: "default" });

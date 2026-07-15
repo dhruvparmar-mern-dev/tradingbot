@@ -1,16 +1,9 @@
 import useTradingStore from "@/store/tradingStore";
 import { runAnalysis } from "@/lib/runAnalysis";
 import { toast } from "sonner";
+import { isMarketOpenNow } from "@/lib/marketHours";
 
-const MARKET_OPEN_MIN = 9 * 60 + 15; // 9:15 AM IST
-const MARKET_CLOSE_MIN = 15 * 60 + 15; // 3:15 PM IST
-
-export function isMarketOpenNow() {
-  const istOffset = 5.5 * 60 * 60 * 1000;
-  const ist = new Date(Date.now() + istOffset);
-  const timeInMinutes = ist.getUTCHours() * 60 + ist.getUTCMinutes();
-  return timeInMinutes >= MARKET_OPEN_MIN && timeInMinutes <= MARKET_CLOSE_MIN;
-}
+export { isMarketOpenNow };
 
 // Single source of truth for "should we auto-buy this stock right now, and if
 // so, do it". Called from two places: the 30s poll in useAutoTrader (the
