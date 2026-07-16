@@ -2,12 +2,14 @@
 import { useEffect, useState } from "react";
 import useAutoTrader from "@/hooks/useAutoTrader";
 import useKiteWebSocket from "@/hooks/useKiteWebSocket";
+import usePreMarketPlanTrigger from "@/hooks/usePreMarketPlanTrigger";
 import useTradingStore from "@/store/tradingStore";
 import { toast } from "sonner";
 
 export default function AppShell({ children }) {
   useAutoTrader();
   useKiteWebSocket();
+  usePreMarketPlanTrigger();
 
   const [loadingPrices, setLoadingPrices] = useState(true);
 
