@@ -1,16 +1,41 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongoose";
 import Stock from "@/models/Stock";
+import { resolvePendingOutcomes } from "@/lib/resolveSignalOutcomes";
 
 export async function GET(request) {
   await connectDB();
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get("symbol");
   const mode = searchParams.get("mode") || "swing";
+  const field = `memory${mode.charAt(0).toUpperCase() + mode.slice(1)}`;
   const stock = await Stock.findOne({ symbol });
-  return NextResponse.json(
-    stock?.[`memory${mode.charAt(0).toUpperCase() + mode.slice(1)}`] || null,
-  );
+  const memory = stock?.[field];
+
+  // Before handing memory back (this is what every AI prompt is built from),
+  // check any old-enough PENDING signals against real candle data. Without
+  // this, non-traded signals stay "PENDING" forever and the AI's own
+  // self-reported memory of whether a past call was right goes unchecked.
+  if (memory?.signalHistory?.length) {
+    try {
+      const { history, changed } = await resolvePendingOutcomes(
+        symbol,
+        mode,
+        memory.signalHistory,
+      );
+      if (changed) {
+        memory.signalHistory = history;
+        await Stock.updateOne(
+          { symbol },
+          { $set: { [`${field}.signalHistory`]: history } },
+        );
+      }
+    } catch (err) {
+      console.error(`Signal outcome resolution failed for ${symbol}:`, err.message);
+    }
+  }
+
+  return NextResponse.json(memory || null);
 }
 
 export async function POST(request) {

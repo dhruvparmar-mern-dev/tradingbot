@@ -197,14 +197,25 @@ Key Levels: Support ₹${memory.keyLevels?.support} | Resistance ₹${memory.key
 Last Signal: ${memory.lastAnalysis?.signal} on ${new Date(memory.lastAnalysis?.date).toLocaleDateString("en-IN", { timeZone: PROMPT_TIMEZONE })} at ₹${memory.lastAnalysis?.price || "unknown"}
 Past Signals: ${memory.signalHistory?.length || 0} signals recorded
 Win Rate: ${memory.winRate ?? "N/A"}% (${memory.completedSignals || 0} completed out of ${memory.totalSignals || 0} total signals)
-Recent Outcomes: ${
+Recent Outcomes (VERIFIED against real subsequent price data, not self-reported): ${
         memory.signalHistory
           ?.filter((s) => s.outcome !== "PENDING")
           .slice(-5)
-          .map(
-            (s) =>
-              `${s.signal}@₹${s.price}→${s.outcome}${s.outcome === "FORCED_EXIT" ? "(time-based)" : ""}`,
-          )
+          .map((s) => {
+            const pct = s.realOutcomePct;
+            let pctPart = "";
+            if (pct != null) {
+              const sign = pct >= 0 ? "+" : "";
+              const flag =
+                s.signal !== "BUY" && pct >= 1
+                  ? " -- MISSED, this would have been a real BUY opportunity"
+                  : s.signal === "BUY" && pct <= -1
+                    ? " -- would have LOST if traded"
+                    : "";
+              pctPart = ` (${sign}${pct}% actual move${flag})`;
+            }
+            return `${s.signal}@₹${s.price}→${s.outcome}${s.outcome === "FORCED_EXIT" ? "(time-based)" : ""}${pctPart}`;
+          })
           .join(", ") || "No completed signals yet"
       }
 
@@ -228,6 +239,7 @@ RULES FOR DECISION MAKING:
 - Market context (NIFTY/sector) is SECONDARY — use it only to:
   (a) avoid trades during a clearly bearish broad market, or
   (b) add minor confidence when technicals and market context align.
+- Recent Outcomes above is VERIFIED against real price data, not your own past self-report. If it shows a past call that was wrong (e.g. a HOLD/SELL that was actually followed by a big move up, or a BUY followed by a drop), treat that as ground truth. Do NOT reuse a past reason (e.g. "RSI reversal confirmed bearish last time") to justify today's signal unless Recent Outcomes actually backs it up -- if it contradicts your memory's character/behavior notes, correct those notes in memoryUpdate instead of repeating the same mistake.
 
 Based on your memory + today's update, give a quick decision.
 Respond in this exact JSON format only, no extra text:

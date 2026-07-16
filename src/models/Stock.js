@@ -35,7 +35,13 @@ const StockSchema = new mongoose.Schema({
         confidence: Number,
         price: Number,
         date: Date,
-        outcome: String, // WIN/LOSS/PENDING - track later
+        outcome: String, // WIN/LOSS/FORCED_EXIT (real trade) / VERIFIED (checked against real candles, never traded) / PENDING
+        // Real % price move from entry to the resolution point, filled in by
+        // resolveSignalOutcomes.js once the signal is old enough to check --
+        // only ever set from actual Kite candle data, never the AI's own claim.
+        realOutcomePct: Number,
+        exitPrice: Number,
+        exitDate: Date,
         winRate: Number,
         totalSignals: Number,
         completedSignals: Number,
@@ -69,7 +75,10 @@ const StockSchema = new mongoose.Schema({
         confidence: Number,
         price: Number,
         date: Date,
-        outcome: String, // WIN/LOSS/PENDING - track later
+        outcome: String, // WIN/LOSS/FORCED_EXIT (real trade) / VERIFIED (checked against real candles, never traded) / PENDING
+        realOutcomePct: Number,
+        exitPrice: Number,
+        exitDate: Date,
         winRate: Number,
         totalSignals: Number,
         completedSignals: Number,
