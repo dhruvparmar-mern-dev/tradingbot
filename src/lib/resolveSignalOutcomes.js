@@ -84,11 +84,19 @@ export async function resolvePendingOutcomes(symbol, mode, signalHistory) {
     try {
       let candles;
       if (mode === "intraday") {
+        const from = new Date(entry.date);
+        // A few leftover pre-fix signals were logged after 15:15 IST (the
+        // after-hours-scan bug root-caused and gated out earlier) -- for
+        // those, the computed EOD cutoff falls before the entry itself.
+        // Clamp so the window is always valid; no real candles will exist
+        // after 15:15 anyway, so this naturally falls through to the
+        // "no candles found" skip below rather than throwing.
+        const to = new Date(Math.max(eodCutoff(entry.date).getTime(), from.getTime()));
         candles = await kite.getHistoricalData(
           instrument.instrument_token,
           "5minute",
-          new Date(entry.date),
-          eodCutoff(entry.date),
+          from,
+          to,
         );
       } else {
         const from = new Date(entry.date);
@@ -100,10 +108,15 @@ export async function resolvePendingOutcomes(symbol, mode, signalHistory) {
           to,
         );
       }
-      if (!candles?.length) continue;
-
-      const exitCandle =
-        mode === "intraday" ? candles.at(-1) : candles[Math.min(4, candles.length - 1)];
+      // No candles usually means the signal itself was logged after 15:15
+      // IST (a handful of leftover pre-fix entries) -- no more trading
+      // happened that day, so entry price stands as the exit price (0%
+      // move) instead of leaving this stuck retrying PENDING forever.
+      const exitCandle = candles?.length
+        ? mode === "intraday"
+          ? candles.at(-1)
+          : candles[Math.min(4, candles.length - 1)]
+        : { close: entry.price, date: entry.date };
       const exitPrice = exitCandle.close;
       const realOutcomePct = Number(
         (((exitPrice - entry.price) / entry.price) * 100).toFixed(2),
