@@ -105,7 +105,7 @@ TRADING MODE: SWING
 - Can hold position for 2-5 days
 - Stop loss should be AT LEAST 1.5x-2x ATR from entry (use the ATR value given below) — this is a baseline, not a rigid range. Place it where the trade thesis is genuinely invalidated (a real support break), even if that's wider than 1.5x-2x ATR.
 - Target should be AT LEAST 3x-4x ATR from entry — this is a floor, not a ceiling. A stock in a strong confirmed trend can be sized for a bigger realistic move.
-- Volume less critical than trend
+- Volume is secondary to trend here -- a confirmed multi-day trend with aligned MACD is enough on its own. Do not default to HOLD just because volume is below average; that repeatedly misses real swing moves that run before volume catches up.
 `;
 
   const indicators = chartData?.indicators;
@@ -235,6 +235,7 @@ ${costAwarenessText}
 RULES FOR DECISION MAKING:
 - Your signal must come from technical analysis: RSI, MACD, trend, support/resistance, volume confirmation.
 - RSI above 70 alone is NOT a reason to avoid a BUY -- a genuinely trending stock can stay overbought for a while. Only treat it as an exhaustion warning when it comes WITH other real evidence: MACD histogram already shrinking from a peak, price failing to make new highs on the most recent candles, or volume fading despite continued price rise. If volume/trend/MACD are all still confirming the move, high RSI reflects strength, not automatic exhaustion.
+- Low or normal volume ALONE is NOT a reason to stay in HOLD when price has already broken a real level and trend + MACD both confirm the move -- this applies especially in SWING mode, where volume is explicitly secondary to trend (see trading mode rules below). Many genuine multi-day breakouts run on thin volume before participation catches up; treat "needs volume confirmation" as a caution for a FRESH, unconfirmed setup, not as a repeatable veto against a move that has already run 2%+ and held there across multiple sessions. For INTRADAY, volume confirmation stays mandatory for a brand-new same-day breakout entry -- this softening is about not re-litigating a move that already has real prior confirmation, not about chasing a fresh intraday spike with no volume behind it.
 - Before calling something a "fresh breakout," check current price against today's High given above. A genuine fresh breakout trades AT or NEAR today's high. If price has already pulled back meaningfully (~1-2%+) from today's high after a big earlier move, that's a spike that already topped and is fading -- not a fresh entry point, even if volume/MACD still look bullish from the initial spike.
 - Market context (NIFTY/sector) is SECONDARY — use it only to:
   (a) avoid trades during a clearly bearish broad market, or
@@ -282,6 +283,7 @@ ${costAwarenessText}
 RULES FOR DECISION MAKING:
 - Your signal must come from technical analysis: RSI, MACD, trend, support/resistance, volume confirmation.
 - RSI above 70 alone is NOT a reason to avoid a BUY -- a genuinely trending stock can stay overbought for a while. Only treat it as an exhaustion warning when it comes WITH other real evidence: MACD histogram already shrinking from a peak, price failing to make new highs on the most recent candles, or volume fading despite continued price rise. If volume/trend/MACD are all still confirming the move, high RSI reflects strength, not automatic exhaustion.
+- Low or normal volume ALONE is NOT a reason to stay in HOLD when price has already broken a real level and trend + MACD both confirm the move -- this applies especially in SWING mode, where volume is explicitly secondary to trend (see trading mode rules below). Many genuine multi-day breakouts run on thin volume before participation catches up; treat "needs volume confirmation" as a caution for a FRESH, unconfirmed setup, not as a repeatable veto against a move that has already run 2%+ and held there across multiple sessions. For INTRADAY, volume confirmation stays mandatory for a brand-new same-day breakout entry -- this softening is about not re-litigating a move that already has real prior confirmation, not about chasing a fresh intraday spike with no volume behind it.
 - Before calling something a "fresh breakout," check current price against today's High given above. A genuine fresh breakout trades AT or NEAR today's high. If price has already pulled back meaningfully (~1-2%+) from today's high after a big earlier move, that's a spike that already topped and is fading -- not a fresh entry point, even if volume/MACD still look bullish from the initial spike.
 - Market context (NIFTY/sector) is SECONDARY — use it only to:
   (a) avoid trades during a clearly bearish broad market, or
