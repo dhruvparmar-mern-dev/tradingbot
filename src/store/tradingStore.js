@@ -111,10 +111,17 @@ const useTradingStore = create((set, get) => ({
     if (!res.ok) return data.error;
 
     const { portfolio, tradeLog } = get();
-    const existing = portfolio.find((p) => p.symbol === stock.symbol);
+    // Mode-scoped -- swing and intraday holdings of the same symbol are
+    // separate positions (Portfolio has a unique index on symbol+mode), so
+    // matching on symbol alone here would overwrite the wrong mode's entry.
+    const existing = portfolio.find(
+      (p) => p.symbol === stock.symbol && p.mode === tradingMode,
+    );
     const newPortfolio = existing
       ? portfolio.map((p) =>
-          p.symbol === stock.symbol ? { ...p, ...data.updatedHolding } : p,
+          p.symbol === stock.symbol && p.mode === tradingMode
+            ? { ...p, ...data.updatedHolding }
+            : p,
         )
       : [...portfolio, { ...stock, ...data.updatedHolding }];
 
@@ -125,25 +132,38 @@ const useTradingStore = create((set, get) => ({
     });
   },
 
-  sellStock: async (symbol, quantity, price) => {
-    const { portfolio, tradeLog } = get();
-    const holding = portfolio.find((p) => p.symbol === symbol);
+  // `mode` should always be passed explicitly by the caller (the mode this
+  // specific holding belongs to) -- falls back to the global tradingMode only
+  // for older call sites that don't have per-holding mode context. Without
+  // this, a symbol held in both swing and intraday would have this match the
+  // wrong one (whichever comes first in the array).
+  sellStock: async (symbol, quantity, price, mode) => {
+    const { portfolio, tradeLog, tradingMode } = get();
+    const sellMode = mode || tradingMode;
+    const holding = portfolio.find(
+      (p) => p.symbol === symbol && p.mode === sellMode,
+    );
     if (!holding) return "no_holding";
-    const mode = holding?.mode || get().tradingMode;
 
     const res = await fetch("/api/trade", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "SELL", symbol, quantity, price, mode }),
+      body: JSON.stringify({
+        type: "SELL",
+        symbol,
+        quantity,
+        price,
+        mode: sellMode,
+      }),
     });
     const data = await res.json();
     if (!res.ok) return data.error;
 
     // Sync portfolio from backend response, not local math
     const newPortfolio = data.fullySold
-      ? portfolio.filter((p) => p.symbol !== symbol)
+      ? portfolio.filter((p) => !(p.symbol === symbol && p.mode === sellMode))
       : portfolio.map((p) =>
-          p.symbol === symbol
+          p.symbol === symbol && p.mode === sellMode
             ? { ...p, quantity: data.updatedHolding.quantity }
             : p,
         );

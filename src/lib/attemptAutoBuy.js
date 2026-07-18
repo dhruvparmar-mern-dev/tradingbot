@@ -28,7 +28,12 @@ export async function attemptAutoBuy(stock, { livePrice } = {}) {
 
   if (!autoTrade) return { bought: false, reason: "autoTrade off" };
   if (!isMarketOpenNow()) return { bought: false, reason: "market closed" };
-  if (portfolio.find((p) => p.symbol === stock.symbol))
+  // Mode-scoped on purpose -- swing and intraday are independent books with
+  // their own capital/rules, so a position open in one shouldn't block a
+  // signal in the other. (Real incident: an open BAJFINANCE intraday
+  // position silently delayed an unrelated swing BUY by ~49 minutes because
+  // this used to match on symbol alone.)
+  if (portfolio.find((p) => p.symbol === stock.symbol && p.mode === tradingMode))
     return { bought: false, reason: "already holding" };
 
   const price = livePrice ?? stock.price;

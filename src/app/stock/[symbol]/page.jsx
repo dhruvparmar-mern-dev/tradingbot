@@ -18,8 +18,10 @@ export default function StockDetail() {
 
   const { buyStock, sellStock, portfolio, balance, tradingMode } =
     useTradingStore();
+  // Mode-scoped -- the same symbol can be held separately under swing and
+  // intraday, so a plain symbol match could show/act on the wrong one.
   const holding = portfolio.find(
-    (p) => p.symbol === decodeURIComponent(symbol),
+    (p) => p.symbol === decodeURIComponent(symbol) && p.mode === tradingMode,
   );
 
   const [hydrated, setHydrated] = useState(false);
@@ -485,7 +487,7 @@ export default function StockDetail() {
                 <button
                   onClick={() => {
                     if (!holding) return toast.error("No holding to sell");
-                    sellStock(stock.symbol, quantity, stock.price);
+                    sellStock(stock.symbol, quantity, stock.price, tradingMode);
                     toast.success(`Sold ${quantity} × ${stock.symbol}`);
                   }}
                   disabled={!holding}

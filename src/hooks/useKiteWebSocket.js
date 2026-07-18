@@ -204,52 +204,65 @@ export default function useKiteWebSocket() {
     const { portfolio, sellStock, tradingMode } = useTradingStore.getState();
 
     for (const tick of ticks) {
-      const holding = portfolio.find((p) => p.symbol === tick.symbol);
-      if (!holding) continue;
+      // filter, not find -- the same symbol can be held under both swing and
+      // intraday at once, each with its own target/stop-loss to check.
+      const holdings = portfolio.filter((p) => p.symbol === tick.symbol);
 
-      const holdingMode = holding.mode || tradingMode;
+      for (const holding of holdings) {
+        const holdingMode = holding.mode || tradingMode;
 
-      try {
-        const memory = await useTradingStore
-          .getState()
-          .getMemory(tick.symbol, holdingMode);
-        if (!memory?.lastAnalysis) continue;
+        try {
+          const memory = await useTradingStore
+            .getState()
+            .getMemory(tick.symbol, holdingMode);
+          if (!memory?.lastAnalysis) continue;
 
-        const { stopLoss, target } = memory.lastAnalysis;
-        // const targetBuffer = target * 0.998; // 0.2% buffer
-        if (target && tick.price >= target) {
-          await sellStock(holding.symbol, holding.quantity, tick.price);
-          await fetch("/api/outcome", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              symbol: holding.symbol,
-              outcome: "WIN",
-              price: tick.price,
-              mode: holdingMode,
-            }),
-          });
-          toast.success(
-            `🎯 Target hit! Sold ${holding.symbol?.replace(".NS", "")} at ₹${tick.price}`,
-          );
-        } else if (stopLoss && tick.price <= stopLoss) {
-          await sellStock(holding.symbol, holding.quantity, tick.price);
-          await fetch("/api/outcome", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              symbol: holding.symbol,
-              outcome: "LOSS",
-              price: tick.price,
-              mode: holdingMode,
-            }),
-          });
-          toast.error(
-            `🛑 Stop loss hit! Sold ${holding.symbol?.replace(".NS", "")} at ₹${tick.price}`,
-          );
+          const { stopLoss, target } = memory.lastAnalysis;
+          // const targetBuffer = target * 0.998; // 0.2% buffer
+          if (target && tick.price >= target) {
+            await sellStock(
+              holding.symbol,
+              holding.quantity,
+              tick.price,
+              holdingMode,
+            );
+            await fetch("/api/outcome", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                symbol: holding.symbol,
+                outcome: "WIN",
+                price: tick.price,
+                mode: holdingMode,
+              }),
+            });
+            toast.success(
+              `🎯 Target hit! Sold ${holding.symbol?.replace(".NS", "")} at ₹${tick.price}`,
+            );
+          } else if (stopLoss && tick.price <= stopLoss) {
+            await sellStock(
+              holding.symbol,
+              holding.quantity,
+              tick.price,
+              holdingMode,
+            );
+            await fetch("/api/outcome", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                symbol: holding.symbol,
+                outcome: "LOSS",
+                price: tick.price,
+                mode: holdingMode,
+              }),
+            });
+            toast.error(
+              `🛑 Stop loss hit! Sold ${holding.symbol?.replace(".NS", "")} at ₹${tick.price}`,
+            );
+          }
+        } catch (err) {
+          console.error("Stop loss check error:", err);
         }
-      } catch (err) {
-        console.error("Stop loss check error:", err);
       }
     }
   }, []);

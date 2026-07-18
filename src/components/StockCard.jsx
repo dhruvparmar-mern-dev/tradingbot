@@ -23,7 +23,11 @@ export default function StockCard({ stock }) {
     useTradingStore();
   const [quantity, setQuantity] = useState(1);
 
-  const holding = portfolio.find((p) => p.symbol === stock.symbol);
+  // Mode-scoped -- the same symbol can be held separately under swing and
+  // intraday, so a plain symbol match could show/act on the wrong one.
+  const holding = portfolio.find(
+    (p) => p.symbol === stock.symbol && p.mode === tradingMode,
+  );
 
   const handleBuyClick = () => {
     if (signal?.signal === "BUY" && signal.target != null) {
@@ -221,6 +225,7 @@ export default function StockCard({ stock }) {
                 stock.symbol,
                 quantity,
                 stock.price,
+                tradingMode,
               );
               if (result === "oversell")
                 return toast.error(`You only have ${holding.quantity} qty!`);

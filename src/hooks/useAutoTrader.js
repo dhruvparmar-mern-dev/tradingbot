@@ -99,13 +99,17 @@ export default function useAutoTrader() {
           );
           if (!priceData) continue;
 
-          // Re-check holding still exists RIGHT NOW (not stale snapshot)
+          const holdingMode = holding.mode || tradingMode; // use the mode this position was bought under
+
+          // Re-check holding still exists RIGHT NOW (not stale snapshot) --
+          // mode-scoped since the same symbol can have separate swing and
+          // intraday holdings.
           const stillHolding = useTradingStore
             .getState()
-            .portfolio.find((p) => p.symbol === holding.symbol);
+            .portfolio.find(
+              (p) => p.symbol === holding.symbol && p.mode === holdingMode,
+            );
           if (!stillHolding) continue; // already sold earlier in this same loop, skip
-
-          const holdingMode = holding.mode || tradingMode; // use the mode this position was bought under
 
           try {
             // const memRes = await fetch(
@@ -122,7 +126,12 @@ export default function useAutoTrader() {
             const currentPrice = priceData.price;
             // const targetBuffer = target * 0.998; // 0.2% buffer
             if (target && currentPrice >= target) {
-              await sellStock(holding.symbol, holding.quantity, currentPrice);
+              await sellStock(
+                holding.symbol,
+                holding.quantity,
+                currentPrice,
+                holdingMode,
+              );
               await fetch("/api/outcome", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -146,7 +155,12 @@ export default function useAutoTrader() {
                 console.error("Post-sell re-analysis failed:", err),
               );
             } else if (stopLoss && currentPrice <= stopLoss) {
-              await sellStock(holding.symbol, holding.quantity, currentPrice);
+              await sellStock(
+                holding.symbol,
+                holding.quantity,
+                currentPrice,
+                holdingMode,
+              );
               await fetch("/api/outcome", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -196,7 +210,13 @@ export default function useAutoTrader() {
 
             if (isForceExitTime) {
               const currentPortfolio = useTradingStore.getState().portfolio;
-              for (const holding of currentPortfolio) {
+              // Only intraday holdings must close by 3:15 PM -- without this
+              // filter, a swing holding would get force-sold too just
+              // because the global tradingMode toggle happened to be
+              // "intraday" at the time.
+              for (const holding of currentPortfolio.filter(
+                (h) => (h.mode || tradingMode) === "intraday",
+              )) {
                 const priceData = validPrices.find(
                   (p) => p.symbol === holding.symbol,
                 );
@@ -208,6 +228,7 @@ export default function useAutoTrader() {
                   holding.symbol,
                   holding.quantity,
                   priceData.price,
+                  holdingMode,
                 );
 
                 const pnl =
