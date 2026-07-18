@@ -214,7 +214,11 @@ Recent Outcomes (VERIFIED against real subsequent price data, not self-reported)
                     : "";
               pctPart = ` (${sign}${pct}% actual move${flag})`;
             }
-            return `${s.signal}@₹${s.price}→${s.outcome}${s.outcome === "FORCED_EXIT" ? "(time-based)" : ""}${pctPart}`;
+            const pnlPart =
+              s.pnl != null
+                ? ` [₹${s.pnl >= 0 ? "+" : ""}${s.pnl} P&L]`
+                : "";
+            return `${s.signal}@₹${s.price}→${s.outcome}${s.outcome === "FORCED_EXIT" ? "(time-based)" : ""}${pnlPart}${pctPart}`;
           })
           .join(", ") || "No completed signals yet"
       }

@@ -42,6 +42,11 @@ const StockSchema = new mongoose.Schema({
         realOutcomePct: Number,
         exitPrice: Number,
         exitDate: Date,
+        // Real ₹ P&L for a closed real trade (WIN/LOSS/FORCED_EXIT) --
+        // /api/outcome used to silently drop this even when the caller
+        // passed it, so FORCED_EXIT entries never recorded whether the
+        // time-based exit was actually a profit or a loss.
+        pnl: Number,
         winRate: Number,
         totalSignals: Number,
         completedSignals: Number,
@@ -79,6 +84,11 @@ const StockSchema = new mongoose.Schema({
         realOutcomePct: Number,
         exitPrice: Number,
         exitDate: Date,
+        // Real ₹ P&L for a closed real trade (WIN/LOSS/FORCED_EXIT) --
+        // /api/outcome used to silently drop this even when the caller
+        // passed it, so FORCED_EXIT entries never recorded whether the
+        // time-based exit was actually a profit or a loss.
+        pnl: Number,
         winRate: Number,
         totalSignals: Number,
         completedSignals: Number,

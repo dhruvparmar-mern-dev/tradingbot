@@ -4,7 +4,7 @@ import Stock from "@/models/Stock";
 
 export async function POST(request) {
   await connectDB();
-  const { symbol, outcome, price, mode } = await request.json();
+  const { symbol, outcome, price, mode, pnl } = await request.json();
   const field = `memory${mode.charAt(0).toUpperCase() + mode.slice(1)}`;
 
   const stock = await Stock.findOne({ symbol });
@@ -27,16 +27,25 @@ export async function POST(request) {
   history[actualIndex].outcome = outcome;
   history[actualIndex].exitPrice = price;
   history[actualIndex].exitDate = new Date();
+  if (pnl != null) history[actualIndex].pnl = pnl;
 
   const actionableSignals = history.filter(
     (s) => s.signal === "BUY" || s.signal === "SELL",
   );
 
-  // const completed = actionableSignals.filter((s) => s.outcome !== "PENDING");
+  // Win rate: WIN/LOSS labels always count. FORCED_EXIT (time-based, not a
+  // real target/stop-loss call) only counts if we know the real P&L sign --
+  // older entries logged before pnl was tracked here stay excluded rather
+  // than guessed at.
   const completed = actionableSignals.filter(
-    (s) => s.outcome === "WIN" || s.outcome === "LOSS", // FORCED_EXIT exclude!
+    (s) =>
+      s.outcome === "WIN" ||
+      s.outcome === "LOSS" ||
+      (s.outcome === "FORCED_EXIT" && s.pnl != null),
   );
-  const wins = completed.filter((s) => s.outcome === "WIN").length;
+  const wins = completed.filter(
+    (s) => s.outcome === "WIN" || (s.outcome === "FORCED_EXIT" && s.pnl > 0),
+  ).length;
   const winRate =
     completed.length > 0 ? ((wins / completed.length) * 100).toFixed(0) : null;
 
