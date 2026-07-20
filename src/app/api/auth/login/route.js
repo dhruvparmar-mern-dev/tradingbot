@@ -56,7 +56,16 @@ export async function POST(request) {
     response.cookies.set("auth_token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      // "strict" broke the Kite OAuth callback: Zerodha redirects the
+      // browser back to /api/kite/callback as a cross-site top-level
+      // navigation, and Strict cookies are withheld on those -- so the new
+      // getUser() check there always saw no session and bounced to /login
+      // *before* exchanging the request_token, leaving the old (by-then-
+      // expired) KiteSession in place. Lax still sends the cookie on
+      // top-level GET navigations (this case) while blocking it on
+      // cross-site POST/XHR/embeds -- the actual CSRF vectors this is meant
+      // to stop.
+      sameSite: "lax",
       maxAge: 30 * 24 * 60 * 60, // 30 days
     });
 
