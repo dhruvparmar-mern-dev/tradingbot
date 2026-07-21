@@ -11,6 +11,7 @@ import ReportModal from "./ReportModal";
 import AiUsageTab from "./AiUsageTab";
 import WatchlistInsights from "./WatchlistInsights";
 import DeepScan from "./DeepScan";
+import PreMarketPlanPanel from "./PreMarketPlanPanel";
 import { attemptAutoBuy } from "@/lib/attemptAutoBuy";
 
 export default function Dashboard() {
@@ -208,6 +209,7 @@ export default function Dashboard() {
             { key: "trades", label: `Trades (${tradeLog.length})` },
             { key: "movers", label: "Today's Top Movers" },
             { key: "deepScan", label: "Deep Scan" },
+            { key: "premarket", label: "Pre-Market Plan" },
             { key: "insights", label: "Watchlist Insights" },
             { key: "aiUsage", label: "AI Usage" },
           ].map((tab) => (
@@ -274,6 +276,7 @@ export default function Dashboard() {
         {!loadingPrices && activeTab === "movers" && <MarketScan />}
 
         {!loadingPrices && activeTab === "deepScan" && <DeepScan />}
+        {!loadingPrices && activeTab === "premarket" && <PreMarketPlanPanel />}
 
         {!loadingPrices && activeTab === "insights" && <WatchlistInsights />}
 
