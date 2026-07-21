@@ -159,16 +159,37 @@ export default function StockCard({ stock }) {
           </span>
         </Link>
 
-        <div className="flex items-baseline gap-2 sm:w-32 shrink-0">
-          <span className="text-xl font-semibold text-white tabular-nums">
-            ₹{stock.price?.toFixed(2)}
-          </span>
-          <span
-            className={`text-xs font-medium tabular-nums ${stock.change >= 0 ? "text-emerald-400" : "text-red-400"}`}
-          >
-            {stock.change >= 0 ? "+" : ""}
-            {stock.change?.toFixed(2)}%
-          </span>
+        <div className="flex flex-col gap-1 sm:w-40 shrink-0">
+          <div className="flex items-baseline gap-2">
+            <span className="text-xl font-semibold text-white tabular-nums">
+              ₹{stock.price?.toFixed(2)}
+            </span>
+            <span
+              className={`text-xs font-medium tabular-nums ${stock.change >= 0 ? "text-emerald-400" : "text-red-400"}`}
+            >
+              {stock.change >= 0 ? "+" : ""}
+              {stock.change?.toFixed(2)}%
+            </span>
+          </div>
+          {holding &&
+            (() => {
+              const pnl = (stock.price - holding.avgPrice) * holding.quantity;
+              const pnlPct =
+                ((stock.price - holding.avgPrice) / holding.avgPrice) * 100;
+              const pnlColor = pnl >= 0 ? "text-emerald-400" : "text-red-400";
+              return (
+                <span className="text-xs text-zinc-500 tabular-nums">
+                  Holding{" "}
+                  <span className="text-zinc-300 font-medium">
+                    {holding.quantity}
+                  </span>{" "}
+                  <span className={`font-medium ${pnlColor}`}>
+                    {pnl >= 0 ? "+" : ""}₹{pnl.toFixed(2)} ({pnl >= 0 ? "+" : ""}
+                    {pnlPct.toFixed(2)}%)
+                  </span>
+                </span>
+              );
+            })()}
         </div>
 
         {/* Ticker strip — quiet, monospace-ish via tabular-nums */}
@@ -188,12 +209,6 @@ export default function StockCard({ stock }) {
               {stock.volume?.toLocaleString("en-IN")}
             </span>
           </span>
-          {holding && (
-            <span className="text-zinc-400">
-              · Holding{" "}
-              <span className="text-white font-medium">{holding.quantity}</span>
-            </span>
-          )}
         </div>
 
         {/* Actions */}
