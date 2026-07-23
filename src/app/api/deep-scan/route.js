@@ -4,7 +4,7 @@ import { connectDB } from "@/lib/mongoose";
 import KiteSession from "@/models/KiteSession";
 import DeepScanLog from "@/models/DeepScanLog";
 import MarketScanSnapshot from "@/models/MarketScanSnapshot";
-import { getNSEInstruments } from "@/lib/kiteInstruments";
+import { getNSEInstruments, isRealEquity } from "@/lib/kiteInstruments";
 import { computeIndicators, calculateVWAP } from "@/lib/indicators";
 import { hasMarketOpenedToday } from "@/lib/marketHours";
 
@@ -47,7 +47,7 @@ export async function POST() {
   }
   kite.setAccessToken(session.accessToken);
 
-  const instruments = (await getNSEInstruments()).filter((i) => i.instrument_type === "EQ");
+  const instruments = (await getNSEInstruments()).filter((i) => i.instrument_type === "EQ" && isRealEquity(i));
 
   // Stage 1 — cheap numeric screen across the whole market. Only floor is
   // price/volume (penny/illiquid removal) -- no minimum today's-move, since

@@ -28,3 +28,16 @@ export async function getNSEInstruments() {
   }
   return inFlightFetch;
 }
+
+// Kite's instrument master tags these as instrument_type "EQ" same as real
+// stocks, so that filter alone doesn't exclude them -- caught live when a
+// market-wide scan surfaced "77GJ40-SG" (a state government bond, +314%) and
+// several "*INAV" tickers (ETF indicative-NAV feeds, e.g. "ECAPININAV" at
+// -99%) as if they were real equity movers. Both are non-tradeable reference
+// feeds/bonds with degenerate price history, not stocks.
+export function isRealEquity(instrument) {
+  const symbol = instrument.tradingsymbol;
+  if (symbol.endsWith("INAV")) return false; // ETF indicative NAV feed
+  if (symbol.endsWith("-SG")) return false; // state government bond (SDL)
+  return true;
+}
